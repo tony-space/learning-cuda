@@ -1,7 +1,7 @@
 #include <GL\glew.h>
 #include <GL\freeglut.h>
-//#include "cuda_runtime.h"
-#include "cuda_gl_interop.h"
+#include <cuda_gl_interop.h>
+#include "kernel.hpp"
 
 GLuint electricFieldTexture = -1;
 cudaGraphicsResource* cudaTextureResource = nullptr;
@@ -42,6 +42,8 @@ void InitScene()
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
 	error = glGetError();
+
+	TextureFetchTest();
 }
 
 void DisplayFunc()

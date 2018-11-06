@@ -21,6 +21,12 @@
       <Project>{69c05666-4e44-4da6-bdb4-058bac0a4b2b}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="kernel.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="kernel.cu" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{BE3FC7B8-3440-47B4-8CF6-593E28A74C25}</ProjectGuid>
     <RootNamespace>StaticElectricField</RootNamespace>

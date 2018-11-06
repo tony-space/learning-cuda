@@ -1,16 +1,12 @@
 #include <GL\glew.h>
 #include <GL\freeglut.h>
-#include <cuda_gl_interop.h>
 #include "kernel.hpp"
 
 GLuint electricFieldTexture = -1;
-cudaGraphicsResource* cudaTextureResource = nullptr;
 
 void InitScene()
 {
 	GLenum error;
-	cudaError_t cudaError;
-
 	glEnable(GL_TEXTURE_2D);
 	error = glGetError();
 
@@ -41,9 +37,11 @@ void InitScene()
 	};
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
 	error = glGetError();
 
-	TextureFetchTest();
+	//TextureFetchTest();
+	OpenGLTextureFetchTest(electricFieldTexture);
 }
 
 void DisplayFunc()

@@ -1,52 +1,64 @@
 #include <GL\glew.h>
 #include <GL\freeglut.h>
+#include <cassert>
 #include "kernel.hpp"
 
 GLuint electricFieldTexture = -1;
+GLuint pboUnpackedBuffer = -1;
 
 void InitScene()
 {
 	GLenum error;
 	glEnable(GL_TEXTURE_2D);
 	error = glGetError();
+	assert(!error);
 
 	glGenTextures(1, &electricFieldTexture);
 	error = glGetError();
+	assert(!error);
 
 	glBindTexture(GL_TEXTURE_2D, electricFieldTexture);
 	error = glGetError();
+	assert(!error);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	error = glGetError();
-	
+	assert(!error);
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	error = glGetError();
-	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	error = glGetError();
-	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	error = glGetError();
+	assert(!error);
 
-	float pixels[] =
-	{
-		1.0f, 1.0f, 1.0f,
-		1.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 1.0f
-	};
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2, 2, 0, GL_RGB, GL_FLOAT, pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2048, 2048, 0, GL_RGBA, GL_FLOAT, nullptr);
 	error = glGetError();
+	assert(!error);
+
+	glGenBuffers(1, &pboUnpackedBuffer);
+	error = glGetError();
+	assert(!error);
+
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboUnpackedBuffer);
+	error = glGetError();
+	assert(!error);
+
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, 2048 * 2048 * 4 * sizeof(float), nullptr, GL_DYNAMIC_COPY);
+	error = glGetError();
+	assert(!error);
 
 	//TextureFetchTest();
-	OpenGLTextureFetchTest(electricFieldTexture);
+	//OpenGLTextureFetchTest(electricFieldTexture);
 }
 
 void DisplayFunc()
 {
+	GLenum error;
 	glClear(GL_COLOR_BUFFER_BIT);
+	
+	GenerateTexture(pboUnpackedBuffer);
+
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 2048, 2048, GL_RGBA, GL_FLOAT, nullptr);
+	error = glGetError();
+	assert(!error);
 
 	glBegin(GL_QUADS);
 	//glColor3f(0.0f, 0.0f, 0.0f);
@@ -84,7 +96,7 @@ int main(int argc, char** argv)
 	glutInit(&argc, argv);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
-	glutInitWindowSize(1366, 768);
+	glutInitWindowSize(900, 900);
 	glutCreateWindow("Static electric field");
 
 	glutReshapeFunc(ReshapeFunc);

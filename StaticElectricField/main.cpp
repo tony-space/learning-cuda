@@ -4,12 +4,19 @@
 #include "kernel.hpp"
 
 GLuint electricFieldTexture = -1;
-GLuint pboUnpackedBuffer = -1;
+//GLuint pboUnpackedBuffer = -1;
+
+static const unsigned kTextureSize = 8192;
 
 void InitScene()
 {
 	GLenum error;
 	glEnable(GL_TEXTURE_2D);
+	error = glGetError();
+	assert(!error);
+
+	GLint texSize;
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &texSize);
 	error = glGetError();
 	assert(!error);
 
@@ -29,21 +36,21 @@ void InitScene()
 	error = glGetError();
 	assert(!error);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 2048, 2048, 0, GL_RGBA, GL_FLOAT, nullptr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, kTextureSize, kTextureSize, 0, GL_RGBA, GL_FLOAT, nullptr);
 	error = glGetError();
 	assert(!error);
 
-	glGenBuffers(1, &pboUnpackedBuffer);
-	error = glGetError();
-	assert(!error);
+	//glGenBuffers(1, &pboUnpackedBuffer);
+	//error = glGetError();
+	//assert(!error);
 
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboUnpackedBuffer);
-	error = glGetError();
-	assert(!error);
+	//glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboUnpackedBuffer);
+	//error = glGetError();
+	//assert(!error);
 
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, 2048 * 2048 * 4 * sizeof(float), nullptr, GL_DYNAMIC_COPY);
-	error = glGetError();
-	assert(!error);
+	//glBufferData(GL_PIXEL_UNPACK_BUFFER, kTextureSize * kTextureSize * 4 * sizeof(float), nullptr, GL_DYNAMIC_COPY);
+	//error = glGetError();
+	//assert(!error);
 
 	//TextureFetchTest();
 	//OpenGLTextureFetchTest(electricFieldTexture);
@@ -51,14 +58,14 @@ void InitScene()
 
 void DisplayFunc()
 {
-	GLenum error;
 	glClear(GL_COLOR_BUFFER_BIT);
 	
-	GenerateTexture(pboUnpackedBuffer);
+	//GeneratePBO(pboUnpackedBuffer, kTextureSize, kTextureSize);
+	ModifyTexture(electricFieldTexture, kTextureSize, kTextureSize);
 
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 2048, 2048, GL_RGBA, GL_FLOAT, nullptr);
-	error = glGetError();
-	assert(!error);
+	//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 2048, 2048, GL_RGBA, GL_FLOAT, nullptr);
+	//error = glGetError();
+	//assert(!error);
 
 	glBegin(GL_QUADS);
 	//glColor3f(0.0f, 0.0f, 0.0f);

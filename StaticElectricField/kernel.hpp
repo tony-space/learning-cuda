@@ -3,4 +3,5 @@
 void TextureFetchTest();
 void OpenGLTextureFetchTest(unsigned textureId);
 
-void GenerateTexture(unsigned pboUnpackedBuffer);
+void GeneratePBO(unsigned pboUnpackedBuffer, unsigned width, unsigned height);
+void ModifyTexture(unsigned textureId, unsigned width, unsigned height);

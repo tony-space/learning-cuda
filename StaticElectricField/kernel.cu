@@ -11,7 +11,7 @@
 
 #include "kernel.hpp"
 
-__global__ void testFetchKernel(float* output, cudaTextureObject_t texObj, int width, int height)
+__global__ void textureFetchKernel(float* output, cudaTextureObject_t texObj, int width, int height)
 {
 	auto x = blockIdx.x * blockDim.x + threadIdx.x;
 	auto y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -66,7 +66,7 @@ void TextureFetchTest()
 	assert(!error);
 
 	dim3 block(2, 2);
-	testFetchKernel <<<1, block >>> (d_output, texObj, 2, 2);
+	textureFetchKernel <<<1, block>>> (d_output, texObj, 2, 2);
 	error = cudaGetLastError();
 	assert(!error);
 
@@ -89,7 +89,7 @@ void TextureFetchTest()
 }
 
 
-__global__ void testOpenGLFetchKernel(unsigned char* output, cudaTextureObject_t texObj, int width, int height)
+__global__ void openGLTextureFetchKernel(unsigned char* output, cudaTextureObject_t texObj, unsigned width, unsigned height)
 {
 	auto x = blockIdx.x * blockDim.x + threadIdx.x;
 	auto y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -142,7 +142,7 @@ void OpenGLTextureFetchTest(unsigned textureId)
 	unsigned char pixels[2 * 2 * 4] = {};
 
 	dim3 blockDim(2, 2);
-	testOpenGLFetchKernel <<<1, blockDim >>>(d_output, texObj, 2, 2);
+	openGLTextureFetchKernel <<<1, blockDim>>> (d_output, texObj, 2, 2);
 	error = cudaGetLastError();
 	assert(!error);
 
@@ -165,7 +165,7 @@ void OpenGLTextureFetchTest(unsigned textureId)
 	assert(!error);
 }
 
-__global__ void testTextureGeneratorKernel(float4* storage, int width, int height, float time)
+__global__ void pboGeneratorKernel(float4* storage, unsigned width, unsigned height, float time)
 {
 	auto x = blockIdx.x * blockDim.x + threadIdx.x;
 	auto y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -182,7 +182,7 @@ __global__ void testTextureGeneratorKernel(float4* storage, int width, int heigh
 	storage[y * width + x] = result;
 }
 
-void GenerateTexture(unsigned pboUnpackedBuffer)
+void GeneratePBO(unsigned pboUnpackedBuffer, unsigned width, unsigned height)
 {
 	cudaError_t error;
 	cudaGraphicsResource* cuResource;
@@ -198,16 +198,92 @@ void GenerateTexture(unsigned pboUnpackedBuffer)
 	error = cudaGraphicsResourceGetMappedPointer(&d_pboStorage, &storageSize, cuResource);
 	assert(!error);
 
-	dim3 gridDim(64, 64);
-	dim3 blockDim(32, 32);
-
 	static auto startTime = std::chrono::system_clock::now();
 	auto now = std::chrono::system_clock::now();
 	auto delta = now - startTime;
 	auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta);
 	float time = milliseconds.count() / 1000.0f;
 
-	testTextureGeneratorKernel <<<gridDim, blockDim >>> ((float4*)d_pboStorage, 2048, 2048, time);
+	dim3 gridDim(width / 32, height / 32);
+	dim3 blockDim(32, 32);
+	pboGeneratorKernel <<<gridDim, blockDim>>> ((float4*)d_pboStorage, width, height, time);
+
+	error = cudaGetLastError();
+	assert(!error);
+
+	error = cudaDeviceSynchronize();
+	assert(!error);
+
+	error = cudaGraphicsUnmapResources(1, &cuResource);
+	assert(!error);
+
+	error = cudaGraphicsUnregisterResource(cuResource);
+	assert(!error);
+}
+
+
+__global__ void openGlTextureModifier(cudaSurfaceObject_t surfObj, unsigned width, unsigned height, float time)
+{
+	auto x = blockIdx.x * blockDim.x + threadIdx.x;
+	auto y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	float u = x / (float)width;
+	float v = y / (float)height;
+
+	float value1 = sin(v * CUDART_PI_F * 2.0f * time + time) / 2.0f + 0.5f;
+	float value2 = cos(u * CUDART_PI_F * 2.0f * time + time) / 2.0f + 0.5f;
+	float value3 = value1 + value2;
+
+	float4 result = {
+		value1,
+		value2,
+		value3,
+		1 };
+
+	surf2Dwrite(result, surfObj, x * sizeof(result), y);
+}
+
+void ModifyTexture(unsigned textureId, unsigned width, unsigned height)
+{
+	cudaError_t error;
+
+	cudaGraphicsResource* cuResource;
+	error = cudaGraphicsGLRegisterImage(&cuResource, textureId, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsNone);
+	assert(!error);
+
+	error = cudaGraphicsMapResources(1, &cuResource);
+	assert(!error);
+
+	cudaArray* cuArray;
+	error = cudaGraphicsSubResourceGetMappedArray(&cuArray, cuResource, 0, 0);
+	assert(!error);
+
+	cudaResourceDesc resDesc = {};
+	resDesc.resType = cudaResourceTypeArray;
+	resDesc.res.array.array = cuArray;
+
+	cudaSurfaceObject_t cuSurfaceObject;
+	error = cudaCreateSurfaceObject(&cuSurfaceObject, &resDesc);
+	assert(!error);
+	
+	static auto startTime = std::chrono::system_clock::now();
+	auto now = std::chrono::system_clock::now();
+	auto delta = now - startTime;
+	auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta);
+	float time = milliseconds.count() / 1000.0f;
+
+	dim3 gridDim(width / 32, height / 32);
+	dim3 blockDim(32, 32);
+	openGlTextureModifier <<<gridDim, blockDim>>> (cuSurfaceObject, width, height, time);
+
+	error = cudaGetLastError();
+	assert(!error);
+
+	error = cudaDeviceSynchronize();
+	assert(!error);
+
+	error = cudaDestroySurfaceObject(cuSurfaceObject);
+	assert(!error);
 
 	error = cudaGraphicsUnmapResources(1, &cuResource);
 	assert(!error);

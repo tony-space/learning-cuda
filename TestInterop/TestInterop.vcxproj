@@ -11,9 +11,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\third-party\freeglut\freeglut.vcxproj">
       <Project>{980bb1e1-6757-47c8-9c2a-323ac3a199f2}</Project>
     </ProjectReference>
@@ -22,14 +19,17 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="kernel.hpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{BE3FC7B8-3440-47B4-8CF6-593E28A74C25}</ProjectGuid>
-    <RootNamespace>StaticElectricField</RootNamespace>
+    <ProjectGuid>{3D353F38-78D8-41EF-A99D-35CB163FECE4}</ProjectGuid>
+    <RootNamespace>TestInterop</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

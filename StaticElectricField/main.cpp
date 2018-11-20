@@ -4,8 +4,6 @@
 #include "kernel.hpp"
 
 GLuint electricFieldTexture = -1;
-//GLuint pboUnpackedBuffer = -1;
-
 static const unsigned kTextureSize = 8192;
 
 void InitScene()
@@ -39,54 +37,30 @@ void InitScene()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, kTextureSize, kTextureSize, 0, GL_RGBA, GL_FLOAT, nullptr);
 	error = glGetError();
 	assert(!error);
-
-	//glGenBuffers(1, &pboUnpackedBuffer);
-	//error = glGetError();
-	//assert(!error);
-
-	//glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pboUnpackedBuffer);
-	//error = glGetError();
-	//assert(!error);
-
-	//glBufferData(GL_PIXEL_UNPACK_BUFFER, kTextureSize * kTextureSize * 4 * sizeof(float), nullptr, GL_DYNAMIC_COPY);
-	//error = glGetError();
-	//assert(!error);
-
-	//TextureFetchTest();
-	//OpenGLTextureFetchTest(electricFieldTexture);
 }
 
 void DisplayFunc()
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	
-	//GeneratePBO(pboUnpackedBuffer, kTextureSize, kTextureSize);
-	ModifyTexture(electricFieldTexture, kTextureSize, kTextureSize);
-
-	//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 2048, 2048, GL_RGBA, GL_FLOAT, nullptr);
-	//error = glGetError();
-	//assert(!error);
+	ProcessElectronField(electricFieldTexture, kTextureSize, kTextureSize);
 
 	glBegin(GL_QUADS);
-	//glColor3f(0.0f, 0.0f, 0.0f);
 	glTexCoord2f(0.0, 0.0);
 	glVertex2f(-1.0f, -1.0f);
 
-	//glColor3f(1.0f, 0.0f, 0.0f);
 	glTexCoord2f(1.0, 0.0);
 	glVertex2f(1.0f, -1.0f);
 
-	//glColor3f(0.0f, 1.0f, 0.0f);
 	glTexCoord2f(1.0, 1.0);
 	glVertex2f(1.0f, 1.0f);
 
-	//glColor3f(0.0f, 0.0f, 1.0f);
 	glTexCoord2f(0.0, 1.0);
 	glVertex2f(-1.0f, 1.0f);
 	glEnd();
 
 	glutSwapBuffers();
-	glutPostRedisplay();
+	//glutPostRedisplay();
 }
 
 void MouseFunc(int button, int state, int x, int y)

@@ -7,8 +7,8 @@
 #include "kernel.hpp"
 #include "CElectricField.hpp"
 
-static const unsigned kTextureWidth = 8096;
-static const unsigned kTextureHeight = 8096;
+static const unsigned kTextureWidth = 8192;
+static const unsigned kTextureHeight = 8192;
 
 std::unique_ptr<CElectricField> g_electricField;
 

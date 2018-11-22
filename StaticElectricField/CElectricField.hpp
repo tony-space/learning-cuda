@@ -15,7 +15,7 @@ public:
 		float charge;
 	};
 
-	CElectricField(GLsizei width, GLsizei height);
+	CElectricField(GLsizei width, GLsizei height, float aspectRatio);
 	~CElectricField();
 
 	void AddParticle(const SParticle& p);
@@ -25,6 +25,7 @@ private:
 	GLuint m_texture;
 	GLsizei m_width;
 	GLsizei m_height;
+	float m_aspectRatio;
 
 	thrust::host_vector<SParticle> m_hostParticles;
 
@@ -32,4 +33,5 @@ private:
 	thrust::device_vector<float3> m_deviceVectorField;
 
 	void UpdateState(float dt);
+	void UpdateTexture();
 };

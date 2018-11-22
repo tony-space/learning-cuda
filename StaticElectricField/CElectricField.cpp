@@ -3,7 +3,7 @@
 
 #include <glm/glm.hpp>
 
-CElectricField::CElectricField(GLsizei width, GLsizei height) : m_width(width), m_height(height)
+CElectricField::CElectricField(GLsizei width, GLsizei height, float aspectRatio) : m_width(width), m_height(height), m_aspectRatio(aspectRatio)
 {
 	GLenum error;
 
@@ -57,7 +57,8 @@ void CElectricField::AddParticle(const SParticle& p)
 
 void CElectricField::Render(float dt)
 {
-	UpdateState(0.005);
+	UpdateState(0.005f);
+	UpdateTexture();
 
 	GLenum error;
 	GLint oldTex;

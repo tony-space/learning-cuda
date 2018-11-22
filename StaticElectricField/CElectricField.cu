@@ -34,7 +34,7 @@ static __global__ void computeElectricVectorFieldKernel(float3* grid, unsigned w
 		float distanceSqr = dx * dx + dy * dy;
 		float invDistance = rsqrt(distanceSqr); // == 1 / distance
 
-		if (distanceSqr < 0.0001)
+		if (distanceSqr < 0.0001f)
 			continue;
 
 		float scalarIntensity = p.charge / distanceSqr;
@@ -66,19 +66,19 @@ static __global__ void updateParticles(float3* grid, unsigned width, unsigned he
 	CElectricField::SParticle& p = particles[index];
 	int2 pixel =
 	{
-		(int)round((p.position.x / aspectRatio + 1.0f) * (width - 1) / 2.0f),
-		(int)round((p.position.y + 1.0f) * (height - 1) / 2.0f)
+		(int)roundf((p.position.x / aspectRatio + 1.0f) * (width - 1) / 2.0f),
+		(int)roundf((p.position.y + 1.0f) * (height - 1) / 2.0f)
 	};
 
 	if (pixel.x < 0)
 	{
-		p.velocity.x = abs(p.velocity.x);
+		p.velocity.x = fabsf(p.velocity.x);
 		p.position.x = -aspectRatio;
 		pixel.x = 0;
 	}
 	if (pixel.y < 0)
 	{
-		p.velocity.y = abs(p.velocity.y);
+		p.velocity.y = fabsf(p.velocity.y);
 		p.position.y = -1.0f;
 		pixel.y = 0;
 	}
@@ -87,14 +87,14 @@ static __global__ void updateParticles(float3* grid, unsigned width, unsigned he
 	{
 		pixel.x = width - 1;
 		p.position.x = aspectRatio;
-		p.velocity.x = -abs(p.velocity.x);
+		p.velocity.x = -fabsf(p.velocity.x);
 	}
 
 	if (pixel.y >= height)
 	{
 		pixel.y = height - 1;
 		p.position.y = 1.0f;
-		p.velocity.y = -abs(p.velocity.y);
+		p.velocity.y = -fabsf(p.velocity.y);
 	}
 
 	const float drag = 0.05f;
@@ -102,11 +102,11 @@ static __global__ void updateParticles(float3* grid, unsigned width, unsigned he
 	float2 force = { intensity.x * p.charge - p.velocity.x * drag, intensity.y * p.charge - p.velocity.y * drag };
 	float2 accel = { force.x / p.mass, force.y / p.mass };
 
-	if (abs(accel.x) > 100.0)
-		accel.x = abs(accel.x) / accel.x * 100.0;
+	if (fabsf(accel.x) > 100.0f)
+		accel.x = fabsf(accel.x) / accel.x * 100.0f;
 
-	if (abs(accel.y) > 100.0)
-		accel.y = abs(accel.y) / accel.y * 100.0;
+	if (fabsf(accel.y) > 100.0f)
+		accel.y = fabsf(accel.y) / accel.y * 100.0f;
 
 	p.velocity.x += accel.x * dt;
 	p.velocity.y += accel.y * dt;

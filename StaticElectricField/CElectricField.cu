@@ -151,8 +151,6 @@ __global__ void renderFieldKernel(float3* grid, cudaSurfaceObject_t surfObj, uns
 
 void CElectricField::UpdateState(float dt)
 {
-	cudaError_t error;
-
 	m_deviceVectorField.resize(m_width * m_height);
 
 	dim3 blockDim(32, 32); //32*32 = 1024 threads per block

@@ -3,7 +3,7 @@
 
 #include <glm/glm.hpp>
 
-CScene::CScene(GLsizei width, GLsizei height, float aspectRatio) : m_width(width), m_height(height), m_aspectRatio(aspectRatio)
+CScene::CScene(GLsizei width, GLsizei height, float aspectRatio) : m_width(width), m_height(height), m_aspectRatio(aspectRatio), m_time(0.0f)
 {
 	GLenum error;
 

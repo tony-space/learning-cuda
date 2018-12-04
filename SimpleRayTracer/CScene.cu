@@ -8,11 +8,10 @@
 
 #include "CScene.hpp"
 
-__device__ const float3 spherePos = { 0.0f, 0.0f, -2.0f };
+__device__ const float3 spherePos = { 0.0f, 0.0f, -1.5f };
 __device__ const float sphereRad = 1.0f;
-__device__ const float3 pointLightPos = { 1.0f, 1.0f, 0.0f };
 
-__global__ void renderFieldKernel(cudaSurfaceObject_t surfObj, unsigned width, unsigned height)
+__global__ void rayTracingKernel(cudaSurfaceObject_t surfObj, unsigned width, unsigned height, float time)
 {
 	auto x = blockIdx.x * blockDim.x + threadIdx.x;
 	auto y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -46,6 +45,7 @@ __global__ void renderFieldKernel(cudaSurfaceObject_t surfObj, unsigned width, u
 	float normalLength = norm3df(normal.x, normal.y, normal.z);
 	normal = { normal.x / normalLength, normal.y / normalLength, normal.z / normalLength };
 
+	float3 pointLightPos = {sinf(time) * sphereRad + spherePos.x, sphereRad * 2.0f, cosf(time) * sphereRad + spherePos.y};
 	float3 lightDiff = { pointLightPos.x - intersection.x, pointLightPos.y - intersection.y, pointLightPos.z - intersection.z };
 	float lightDiffLength = norm3df(lightDiff.x, lightDiff.y, lightDiff.z);
 
@@ -59,10 +59,11 @@ __global__ void renderFieldKernel(cudaSurfaceObject_t surfObj, unsigned width, u
 
 void CScene::UpdateTexture(float dt)
 {
+	m_time += dt;
 	cudaError_t error;
 
-	dim3 blockDim(32, 32); //32*32 = 1024 threads per block
-	dim3 gridDim((m_width - 1) / 32 + 1, (m_height - 1) / 32 + 1);
+	dim3 blockDim(8, 8);
+	dim3 gridDim((m_width - 1) / blockDim.x + 1, (m_height - 1) / blockDim.y + 1);
 
 	cudaGraphicsResource* cuResource;
 	error = cudaGraphicsGLRegisterImage(&cuResource, m_texture, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsNone);
@@ -83,8 +84,7 @@ void CScene::UpdateTexture(float dt)
 	error = cudaCreateSurfaceObject(&cuSurfaceObject, &resDesc);
 	assert(!error);
 
-
-	renderFieldKernel << <gridDim, blockDim >> > (cuSurfaceObject, m_width, m_height);
+	rayTracingKernel <<<gridDim, blockDim>>>(cuSurfaceObject, m_width, m_height, m_time);
 
 	error = cudaGetLastError();
 	assert(!error);

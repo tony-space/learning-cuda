@@ -14,6 +14,7 @@ private:
 	GLsizei m_width;
 	GLsizei m_height;
 	float m_aspectRatio;
+	float m_time;
 
 	void UpdateTexture(float dt);
 };

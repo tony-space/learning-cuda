@@ -7,8 +7,8 @@
 #include "kernel.hpp"
 #include "CScene.hpp"
 
-static const unsigned kTextureWidth = 900;
-static const unsigned kTextureHeight = 900;
+static const unsigned kTextureWidth = 8192;
+static const unsigned kTextureHeight = 8192;
 
 std::unique_ptr<CScene> g_scene;
 
@@ -34,15 +34,15 @@ void DisplayFunc()
 	static auto lastTime = std::chrono::system_clock::now();
 	auto now = std::chrono::system_clock::now();
 	auto delta = now - lastTime;
-	auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta);
-	float dt = milliseconds.count() / 1000.0f;
+	auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(delta);
+	float dt = microseconds.count() / 1000000.0f;
 	lastTime = now;
 
 	g_scene->Render(dt);
 	//printf("FPS: %.1f\r\n", 1 / dt);
 
 	glutSwapBuffers();
-	//glutPostRedisplay();
+	glutPostRedisplay();
 }
 
 void MouseFunc(int button, int state, int x, int y)
@@ -74,7 +74,7 @@ int main(int argc, char** argv)
 	*/
 	typedef bool (APIENTRY *PFNWGLSWAPINTERVALEXTPROC)        (int interval);
 	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-	wglSwapIntervalEXT(0);
+	wglSwapIntervalEXT(1);
 
 
 	glutReshapeFunc(ReshapeFunc);

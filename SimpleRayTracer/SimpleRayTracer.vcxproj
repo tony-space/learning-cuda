@@ -61,10 +61,10 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

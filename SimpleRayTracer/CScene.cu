@@ -5,6 +5,7 @@
 #include <device_launch_parameters.h>
 #include <cuda_gl_interop.h>
 #include <cassert>
+#include <helper_math.h>
 
 #include "CScene.hpp"
 
@@ -19,15 +20,11 @@ __global__ void rayTracingKernel(cudaSurfaceObject_t surfObj, unsigned width, un
 	if (x >= width || y >= height)
 		return;
 
-	float3 ray = { float(x) / float(width - 1) * 2.0f - 1.0f, float(y) / float(height - 1) * 2.0f - 1.0f, -1.0f };
-	float length = norm3df(ray.x, ray.y, ray.z);
-	ray.x /= length;
-	ray.y /= length;
-	ray.z /= length;
+	float3 ray = normalize(make_float3(float(x) / float(width - 1) * 2.0f - 1.0f, float(y) / float(height - 1) * 2.0f - 1.0f, -1.0f));
 
-	float projection = spherePos.x * ray.x + spherePos.y * ray.y + spherePos.z * ray.z;
-	float3 sphereCenterProj = { ray.x * projection, ray.y * projection, ray.z * projection };
-	float3 diff = { sphereCenterProj.x - spherePos.x, sphereCenterProj.y - spherePos.y, sphereCenterProj.z - spherePos.z };
+	float projection = dot(spherePos, ray);
+	float3 sphereCenterProj = ray * projection;
+	float3 diff = sphereCenterProj - spherePos;
 	float diffLength = norm3df(diff.x, diff.y, diff.z);
 	if (diffLength > sphereRad)
 	{
@@ -39,17 +36,13 @@ __global__ void rayTracingKernel(cudaSurfaceObject_t surfObj, unsigned width, un
 	float halfChord = sqrtf(sphereRad * sphereRad - diffLength * diffLength);
 	
 	float intersectionLength = projection - halfChord;
-	float3 intersection = { ray.x * intersectionLength, ray.y * intersectionLength, ray.z * intersectionLength };
-	
-	float3 normal = { intersection.x - spherePos.x, intersection.y - spherePos.y, intersection.z - spherePos.z };
-	float normalLength = norm3df(normal.x, normal.y, normal.z);
-	normal = { normal.x / normalLength, normal.y / normalLength, normal.z / normalLength };
+	float3 intersection = ray * intersectionLength;
+	float3 normal = normalize(intersection - spherePos);
 
-	float3 pointLightPos = {sinf(time) * sphereRad + spherePos.x, sphereRad * 2.0f, cosf(time) * sphereRad + spherePos.y};
-	float3 lightDiff = { pointLightPos.x - intersection.x, pointLightPos.y - intersection.y, pointLightPos.z - intersection.z };
-	float lightDiffLength = norm3df(lightDiff.x, lightDiff.y, lightDiff.z);
+	float3 pointLightPos = make_float3(sinf(time) * 3.0f, 2.0f, cosf(time) * 3.0f) + spherePos;
 
-	float intensity = normal.x * lightDiff.x / lightDiffLength + normal.y * lightDiff.y / lightDiffLength + normal.z * lightDiff.z / lightDiffLength;
+	float intensity = dot(normal, normalize(pointLightPos - intersection));
+
 	if (intensity <= 0.0f)
 		intensity = 0.0f;
 	

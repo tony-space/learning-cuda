@@ -1,4 +1,5 @@
 #include <GL\glew.h>
+#include <GL\wglew.h>
 #include <GL\freeglut.h>
 #include <cassert>
 #include <memory>
@@ -62,35 +63,32 @@ void MouseFunc(int button, int state, int x, int y)
 void ReshapeFunc(int w, int h)
 {
 	glViewport(0, 0, w, h);
-	/*glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();*/
+}
 
-	//double aspectRatio = double(w) / double(h);
-
-	//glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+void CloseFunc()
+{
+	g_electricField.reset();
 }
 
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
-	glutInitWindowSize(1920, 1080);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH /*| GLUT_BORDERLESS | GLUT_CAPTIONLESS*/);
+	glutInitWindowSize(1366, 768);
 	glutCreateWindow("Static electric field");
 
 	/*glutGameModeString("1920x1080");
 	glutEnterGameMode();
 	*/
-	typedef bool (APIENTRY *PFNWGLSWAPINTERVALEXTPROC)        (int interval);
-	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-	wglSwapIntervalEXT(0);
-
 
 	glutReshapeFunc(ReshapeFunc);
 	glutDisplayFunc(DisplayFunc);
 	glutMouseFunc(MouseFunc);
+	glutCloseFunc(CloseFunc);
 
 	auto err = glewInit();
+	wglSwapIntervalEXT(0);
 	InitScene();
 
 	glutMainLoop();

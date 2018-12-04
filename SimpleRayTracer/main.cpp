@@ -1,4 +1,5 @@
 #include <GL\glew.h>
+#include <GL\wglew.h>
 #include <GL\freeglut.h>
 #include <cassert>
 #include <memory>
@@ -60,6 +61,11 @@ void ReshapeFunc(int w, int h)
 	//glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 }
 
+void CloseFunc()
+{
+	g_scene.reset();
+}
+
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -72,16 +78,15 @@ int main(int argc, char** argv)
 	/*glutGameModeString("1920x1080");
 	glutEnterGameMode();
 	*/
-	typedef bool (APIENTRY *PFNWGLSWAPINTERVALEXTPROC)        (int interval);
-	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-	wglSwapIntervalEXT(1);
 
 
 	glutReshapeFunc(ReshapeFunc);
 	glutDisplayFunc(DisplayFunc);
 	glutMouseFunc(MouseFunc);
+	glutCloseFunc(CloseFunc);
 
 	auto err = glewInit();
+	wglSwapIntervalEXT(1);
 	InitScene();
 
 	glutMainLoop();

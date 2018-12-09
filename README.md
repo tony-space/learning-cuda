@@ -2,7 +2,7 @@
 It's just a hobby project. I learn CUDA when I have some free time. Inspired by Udacity course "Intro to parallel programming" ([Youtube link](https://www.youtube.com/playlist?list=PLAwxTw4SYaPnFKojVQrmyOGFCqHTxfdv2 "Youtube link"))
 
 # Prerequisites
-The source code is using CUDA 10.0, VS2017 Community and Windows 10 SDK 10.0.17134.0
+The source code is using CUDA 10.0, VS2017 Community and Windows 10 SDK 10.0.17763.0
 
 # CUDA setup known issues
 I've run into some issues during project setup. Here are some workarounds I've discovered.

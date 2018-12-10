@@ -1,15 +1,23 @@
+#define _USE_MATH_DEFINES
+#define GLM_FORCE_SWIZZLE
+
 #include <GL\glew.h>
 #include <GL\wglew.h>
 #include <GL\freeglut.h>
-#define GLM_FORCE_SWIZZLE
 #include <glm\glm.hpp>
 #include <glm\gtc\type_ptr.hpp>
 #include <glm\gtc\random.hpp>
 #include <memory>
 #include <chrono>
 #include <sstream>
+#include <cmath>
+#include <vector>
 
 #include "CShaderProgram.hpp"
+
+static const float g_fov = 60.0f;
+static float g_windowHeight = 1.0f;
+
 
 std::unique_ptr<CShaderProgram> g_spriteShader;
 glm::vec4 g_camera = glm::vec4(0.0f, 0.0f, 0.0f, 1.5f);
@@ -20,7 +28,7 @@ glm::vec2 g_mouseDelta;
 auto g_lastFrameTime = std::chrono::high_resolution_clock::now();
 float g_deltaTime = 0.0f;
 
-static const size_t kMolecules = 1024;
+static const size_t kMolecules = 128;
 GLuint g_moleculesVBO;
 
 void InitScene()
@@ -36,13 +44,18 @@ void InitScene()
 
 	g_spriteShader = std::make_unique<CShaderProgram>("shaders\\vertex.glsl", "shaders\\fragment.glsl");
 
-	glm::vec3 molecules[kMolecules];
-	for (size_t i = 0; i < kMolecules; ++i)
-		molecules[i] = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
+	std::vector<glm::vec3> molecules(kMolecules * kMolecules * 2);
+	for (size_t y = 0; y < kMolecules; ++y)
+		for (size_t x = 0; x < kMolecules; ++x)
+		{
+			size_t index = (x + y * kMolecules) * 2;
+			molecules[index] = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
+			molecules[index + 1] = glm::linearRand(glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f, 1.0f, 1.0f));
+		}
 
 	glGenBuffers(1, &g_moleculesVBO);
 	glBindBuffer(GL_ARRAY_BUFFER, g_moleculesVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(molecules), molecules, GL_STREAM_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, molecules.size() * sizeof(molecules[0]), molecules.data(), GL_STREAM_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -56,7 +69,7 @@ void DisplayFunc()
 	g_lastFrameTime = now;
 
 	g_deltaTime = float(std::chrono::duration_cast<std::chrono::nanoseconds>(deltaTime).count()) * 1e-9f;
-	
+
 	static float __timeCounter = 0.0f;
 	__timeCounter += g_deltaTime;
 	if (__timeCounter > 1.0f)
@@ -68,8 +81,6 @@ void DisplayFunc()
 	}
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
 
 	static const float mass = 1.0f;
 	static const float stiffness = 2.0f;
@@ -80,26 +91,45 @@ void DisplayFunc()
 	g_camera += g_cameraVelocity * g_deltaTime;
 	g_mouseDelta *= 0.0f;
 
-	glTranslatef(0.0f, 0.0f, -g_camera.w);
-	glRotatef(g_camera.x, 1.0f, 0.0f, 0.0f);
-	glRotatef(g_camera.y, 0.0f, 1.0f, 0.0f);
-	glRotatef(g_camera.z, 0.0f, 0.0f, 1.0f);
+	glm::mat4 modelView = glm::identity<glm::mat4>();
+	modelView = glm::translate(modelView, glm::vec3(0.0f, 0.0f, -g_camera.w));
+	modelView = glm::rotate(modelView, glm::radians(g_camera.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	modelView = glm::rotate(modelView, glm::radians(g_camera.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelView = glm::rotate(modelView, glm::radians(g_camera.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadMatrixf(glm::value_ptr(modelView));
 
 	glutWireCube(1.0f);
 
 	{
 		auto smartSwitcher = g_spriteShader->Activate();
-		g_spriteShader->SetUniform("pointRadius", 20.0f);
+
+		static const glm::vec4 lightDirection = glm::normalize(glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
+		g_spriteShader->SetUniform("pointRadius", 0.01f);
+		g_spriteShader->SetUniform("pointScale", g_windowHeight / tanf(g_fov / 2.0f *  float(M_PI) / 180.0f));
+		g_spriteShader->SetUniform("lightDir", (modelView * lightDirection).xyz);
 
 		glBindBuffer(GL_ARRAY_BUFFER, g_moleculesVBO);
-		
+
 		glEnableClientState(GL_VERTEX_ARRAY);
-		glVertexPointer(3, GL_FLOAT, 0, nullptr);
-		glDrawArrays(GL_POINTS, 0, kMolecules);
+		glEnableClientState(GL_COLOR_ARRAY);
+		glVertexPointer(3, GL_FLOAT, 24, nullptr);
+		glColorPointer(3, GL_FLOAT, 24, (void*)12);
+		glDrawArrays(GL_POINTS, 0, kMolecules * kMolecules);
 		glDisableClientState(GL_VERTEX_ARRAY);
-		
+		glDisableClientState(GL_COLOR_ARRAY);
+
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
+
+	/*glBegin(GL_LINE_LOOP);
+	glVertex2f(-0.5f, -0.5f);
+	glVertex2f(0.5f, -0.5f);
+	glVertex2f(0.5f, 0.5f);
+	glVertex2f(-0.5f, 0.5f);
+	glEnd();*/
 
 	glutSwapBuffers();
 	glutPostRedisplay();
@@ -118,7 +148,7 @@ void MotionFunc(int x, int y)
 		g_prevMouseState = mouseState;
 		return;
 	}
-	
+
 	g_mouseDelta = mouseState - g_prevMouseState;
 	if (glm::length(g_mouseDelta) > 100.0f)
 		g_mouseDelta *= 0.0f;
@@ -132,7 +162,8 @@ void ReshapeFunc(int w, int h)
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(60, GLdouble(w) / h, 0.01, 100.0);
+	gluPerspective(g_fov, GLdouble(w) / h, 0.01, 100.0);
+	g_windowHeight = float(h);
 }
 
 void CloseFunc()

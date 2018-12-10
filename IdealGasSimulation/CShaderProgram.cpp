@@ -1,4 +1,3 @@
-#include <gl\glew.h>
 #include <cstdio>
 #include <stdexcept>
 #include <vector>
@@ -180,6 +179,25 @@ void CShaderProgram::SetUniform(const std::string& name, float value)
 	}
 
 	glUniform1f(location, value);
+}
+
+void CShaderProgram::SetUniform(const std::string & name, glm::vec3 value)
+{
+	GLenum status;
+	GLint location;
+	auto it = m_uniformLocationCache.find(name);
+	if (it != m_uniformLocationCache.end())
+		location = it->second;
+	else
+	{
+		location = glGetUniformLocation(m_program, name.c_str());
+		status = glGetError();
+		if (status != GL_NO_ERROR) throw std::runtime_error("glGetUniformLocation failed");
+
+		m_uniformLocationCache[name] = location;
+	}
+
+	glUniform3f(location, value.x, value.y, value.z);
 }
 
 CShaderProgram::ProgramSwitcher::ProgramSwitcher(GLuint program)

@@ -1,5 +1,6 @@
 #pragma once
 #include <gl\glew.h>
+#include <glm\glm.hpp>
 #include <map>
 #include <string>
 
@@ -21,6 +22,7 @@ public:
 	CShaderProgram(const std::string& vertexPath, const std::string& fragmentPath);
 	~CShaderProgram();
 	void SetUniform(const std::string& name, float value);
+	void SetUniform(const std::string& name, glm::vec3 value);
 	ProgramSwitcher Activate() const { return ProgramSwitcher(m_program); }
 private:
 	GLuint m_program;

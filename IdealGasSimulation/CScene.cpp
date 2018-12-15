@@ -8,7 +8,9 @@
 #include <vector>
 #include <cmath>
 
-static const size_t kMolecules = 1024;
+#include "Simulation.cuh"
+
+static const size_t kMolecules = 4096;
 
 CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl")
 {
@@ -18,11 +20,11 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	for (auto& p : positions)
 		p = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 
+	for (auto& v : velocities)
+		v = glm::sphericalRand(0.1f);
+
 	for (auto& c : colors)
 		c = glm::linearRand(glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f, 1.0f, 1.0f));
-
-	for (auto& v : velocities)
-		v = glm::sphericalRand(1.0f);
 
 	std::vector<glm::vec3> bufferData;
 	bufferData.reserve(kMolecules * 3);
@@ -44,6 +46,13 @@ CScene::~CScene()
 {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDeleteBuffers(1, &m_moleculesVBO);
+	auto err = glGetError();
+	assert(err == GL_NO_ERROR);
+}
+
+void CScene::UpdateState(float dt)
+{
+	cudasim::UpdateState(m_moleculesVBO, kMolecules, dt);
 }
 
 void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
@@ -66,4 +75,7 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 	glDisableClientState(GL_COLOR_ARRAY);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	auto err = glGetError();
+	assert(err == GL_NO_ERROR);
 }

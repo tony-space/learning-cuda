@@ -39,9 +39,6 @@ void InitScene()
 
 void DisplayFunc()
 {
-	//
-	// put computations here
-	//
 	auto now = std::chrono::high_resolution_clock::now();
 	auto deltaTime = now - g_lastFrameTime;
 	g_lastFrameTime = now;
@@ -57,6 +54,8 @@ void DisplayFunc()
 		glutSetWindowTitle(str.str().c_str());
 		__timeCounter = 0.0f;
 	}
+
+	g_scene->UpdateState(g_deltaTime);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

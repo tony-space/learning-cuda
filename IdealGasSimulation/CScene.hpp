@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CShaderProgram.hpp"
-#include "CSimulation.hpp"
+#include "Simulation.hpp"
 #include <memory>
 
 class CScene
@@ -16,5 +16,6 @@ private:
 	CShaderProgram m_spriteShader;
 	GLuint m_moleculesVBO;
 
-	std::unique_ptr<CSimulation> m_cudaSim;
+	//std::unique_ptr<CSimulation> m_cudaSim;
+	std::unique_ptr<ISimulation> m_cudaSim;
 };

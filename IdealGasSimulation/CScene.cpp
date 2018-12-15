@@ -40,7 +40,8 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	auto err = glGetError();
 	assert(err == GL_NO_ERROR);
 
-	m_cudaSim = std::make_unique<CSimulation>(m_moleculesVBO, kMolecules);
+	//m_cudaSim = std::make_unique<CSimulation>(m_moleculesVBO, kMolecules);
+	m_cudaSim = ISimulation::CreateInstance(m_moleculesVBO, kMolecules);
 }
 
 CScene::~CScene()

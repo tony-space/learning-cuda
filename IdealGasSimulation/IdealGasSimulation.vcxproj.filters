@@ -3,9 +3,11 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="CShaderProgram.cpp" />
+    <ClCompile Include="CScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CShaderProgram.hpp" />
+    <ClInclude Include="CScene.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\fragment.glsl" />

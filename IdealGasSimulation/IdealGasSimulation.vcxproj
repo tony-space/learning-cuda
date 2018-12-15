@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CScene.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="CShaderProgram.cpp" />
   </ItemGroup>
@@ -27,6 +28,7 @@
     <None Include="shaders\vertex.glsl" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CScene.hpp" />
     <ClInclude Include="CShaderProgram.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

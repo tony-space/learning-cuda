@@ -8,9 +8,8 @@
 #include <vector>
 #include <cmath>
 
-#include "Simulation.cuh"
 
-static const size_t kMolecules = 4096;
+static const size_t kMolecules = 1024;
 
 CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl")
 {
@@ -21,7 +20,7 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 		p = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 
 	for (auto& v : velocities)
-		v = glm::sphericalRand(0.1f);
+		v = glm::sphericalRand(1.0f) * glm::linearRand(0.0f, 1.0f);
 
 	for (auto& c : colors)
 		c = glm::linearRand(glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f, 1.0f, 1.0f));
@@ -40,10 +39,14 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 
 	auto err = glGetError();
 	assert(err == GL_NO_ERROR);
+
+	m_cudaSim = std::make_unique<CSimulation>(m_moleculesVBO, kMolecules);
 }
 
 CScene::~CScene()
 {
+	m_cudaSim.reset();
+
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDeleteBuffers(1, &m_moleculesVBO);
 	auto err = glGetError();
@@ -52,7 +55,7 @@ CScene::~CScene()
 
 void CScene::UpdateState(float dt)
 {
-	cudasim::UpdateState(m_moleculesVBO, kMolecules, dt);
+	m_cudaSim->UpdateState(dt);
 }
 
 void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)

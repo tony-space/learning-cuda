@@ -8,13 +8,13 @@
   <ItemGroup>
     <ClInclude Include="CShaderProgram.hpp" />
     <ClInclude Include="CScene.hpp" />
-    <ClInclude Include="Simulation.cuh" />
+    <ClInclude Include="CSimulation.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\fragment.glsl" />
     <None Include="shaders\vertex.glsl" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="Simulation.cu" />
+    <CudaCompile Include="CSimulation.cu" />
   </ItemGroup>
 </Project>

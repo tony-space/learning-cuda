@@ -30,10 +30,10 @@
   <ItemGroup>
     <ClInclude Include="CScene.hpp" />
     <ClInclude Include="CShaderProgram.hpp" />
-    <ClInclude Include="Simulation.cuh" />
+    <ClInclude Include="CSimulation.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="Simulation.cu" />
+    <CudaCompile Include="CSimulation.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{38804A48-652A-4C03-9C2F-2237ED237E02}</ProjectGuid>

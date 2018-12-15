@@ -64,7 +64,7 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 	auto smartSwitcher = m_spriteShader.Activate();
 
 	static const glm::vec4 lightDirection = glm::normalize(glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
-	m_spriteShader.SetUniform("pointRadius", 0.01f);
+	m_spriteShader.SetUniform("pointRadius", m_cudaSim->GetParticleRadius());
 	m_spriteShader.SetUniform("pointScale", windowHeight / tanf(fov / 2.0f *  float(M_PI) / 180.0f));
 	m_spriteShader.SetUniform("lightDir", (mvm * lightDirection).xyz);
 
@@ -82,4 +82,9 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 
 	auto err = glGetError();
 	assert(err == GL_NO_ERROR);
+}
+
+float CScene::GetParticleRadius() const
+{
+	return 0.0f;
 }

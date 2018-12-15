@@ -8,32 +8,35 @@
 
 #include "Simulation.hpp"
 
+static constexpr float kParticleRad = 0.01f;
+
 __global__ void processParticles(float3 posArray[], float3 velArray[], size_t particles, float dt)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particles)
 		return;
 
-	float3 pos = posArray[threadId];
-	float3 vel = velArray[threadId];
+	auto pos = posArray[threadId];
+	auto vel = velArray[threadId];
 
 	pos += vel * dt;
 
-	if (fabs(pos.x) >= 0.5f)
+	auto penetration = (fabs(pos) + kParticleRad) - 0.5f;
+	if (penetration.x >= 0.0f)
 	{
-		pos.x = copysignf(0.5f, pos.x);
+		pos.x = copysignf(0.5f - kParticleRad - penetration.x, pos.x);
 		vel.x = -vel.x;
 	}
 
-	if (fabs(pos.y) >= 0.5f)
+	if (penetration.y >= 0.0f)
 	{
-		pos.y = copysignf(0.5f, pos.y);
+		pos.y = copysignf(0.5f - kParticleRad - penetration.y, pos.y);
 		vel.y = -vel.y;
 	}
 
-	if (fabs(pos.z) >= 0.5f)
+	if (penetration.z >= 0.0f)
 	{
-		pos.z = copysignf(0.5f, pos.z);
+		pos.z = copysignf(0.5f - kParticleRad - penetration.z, pos.z);
 		vel.z = -vel.z;
 	}
 
@@ -87,7 +90,12 @@ public:
 		dim3 blockDim(128);
 		dim3 gridDim((unsigned(m_particles) - 1) / blockDim.x + 1);
 
-		processParticles << <gridDim, blockDim >> > (m_devicePositions, m_deviceVelocities, m_particles, dt);
+		processParticles <<<gridDim, blockDim >>> (m_devicePositions, m_deviceVelocities, m_particles, dt);
+	}
+
+	virtual float GetParticleRadius() const override
+	{
+		return kParticleRad;
 	}
 };
 

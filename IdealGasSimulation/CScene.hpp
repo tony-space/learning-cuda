@@ -12,6 +12,7 @@ public:
 
 	void UpdateState(float dt);
 	void Render(float windowHeight, float fov, glm::mat4 mvm);
+	float GetParticleRadius() const;
 private:
 	CShaderProgram m_spriteShader;
 	GLuint m_moleculesVBO;

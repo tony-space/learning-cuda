@@ -19,6 +19,7 @@ glm::vec4 g_camera = glm::vec4(0.0f, 0.0f, 0.0f, 1.5f);
 glm::vec4 g_cameraVelocity;
 glm::vec2 g_prevMouseState;
 glm::vec2 g_mouseDelta;
+bool g_moveCamera = false;
 
 auto g_lastFrameTime = std::chrono::high_resolution_clock::now();
 float g_deltaTime = 0.0f;
@@ -47,7 +48,7 @@ void DisplayFunc()
 
 	static float __timeCounter = 0.0f;
 	__timeCounter += g_deltaTime;
-	if (__timeCounter > 1.0f)
+	if (__timeCounter > 0.5f)
 	{
 		std::stringstream str;
 		str << "Ideal gas simulation FPS: " << int(1.0f / g_deltaTime);
@@ -70,8 +71,8 @@ void DisplayFunc()
 
 	glm::mat4 modelView = glm::identity<glm::mat4>();
 	modelView = glm::translate(modelView, glm::vec3(0.0f, 0.0f, -g_camera.w));
-	modelView = glm::rotate(modelView, glm::radians(g_camera.x), glm::vec3(1.0f, 0.0f, 0.0f));
-	modelView = glm::rotate(modelView, glm::radians(g_camera.y), glm::vec3(0.0f, 1.0f, 0.0f));
+	modelView = glm::rotate(modelView, glm::radians(-g_camera.x), glm::vec3(1.0f, 0.0f, 0.0f));
+	modelView = glm::rotate(modelView, glm::radians(-g_camera.y), glm::vec3(0.0f, 1.0f, 0.0f));
 	modelView = glm::rotate(modelView, glm::radians(g_camera.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
 
@@ -89,12 +90,19 @@ void DisplayFunc()
 
 void MouseFunc(int button, int state, int x, int y)
 {
+	if (button == GLUT_LEFT_BUTTON)
+	{
+		if (state == GLUT_UP)
+			g_moveCamera = false;
+		else if (state == GLUT_DOWN)
+			g_moveCamera = true;
+	}
 }
 
 void MotionFunc(int x, int y)
 {
 	glm::vec2 mouseState(x, y);
-	if (g_prevMouseState == glm::vec2(0.0f, 0.0f) || g_deltaTime == 0.0f)
+	if (g_prevMouseState == glm::vec2(0.0f, 0.0f) || g_deltaTime == 0.0f || !g_moveCamera)
 	{
 		g_prevMouseState = mouseState;
 		return;

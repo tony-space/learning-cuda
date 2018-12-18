@@ -10,15 +10,23 @@
 
 static constexpr float kParticleRad = 0.01f;
 
-__global__ void processParticles(float3 posArray[], float3 velArray[], size_t particles, float dt)
+struct SParticle
+{
+	float3 pos;
+	float3 vel;
+};
+
+
+__global__ void processParticles(SParticle particles[], size_t particlesCount, float dt)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particles)
+	if (threadId >= particlesCount)
 		return;
 
-	auto pos = posArray[threadId];
-	auto vel = velArray[threadId];
-
+	auto particle = particles[threadId];
+	auto& pos = particle.pos;
+	auto& vel = particle.vel;
+	
 	pos += vel * dt;
 
 	auto penetration = (fabs(pos) + kParticleRad) - 0.5f;
@@ -40,22 +48,20 @@ __global__ void processParticles(float3 posArray[], float3 velArray[], size_t pa
 		vel.z = -vel.z;
 	}
 
-	posArray[threadId] = pos;
-	velArray[threadId] = vel;
+	particles[threadId] = particle;
 }
 
 class CSimulation : public ISimulation
 {
 private:
 	const GLuint m_stateVBO;
-	const size_t m_particles;
+	const size_t m_particlesCount;
 
 	cudaGraphicsResource_t m_resource;
-	float3* m_devicePositions;
-	float3* m_deviceVelocities;
+	SParticle* m_deviceParticles;
 
 public:
-	CSimulation(GLuint stateVBO, size_t particles) : m_stateVBO(stateVBO), m_particles(particles)
+	CSimulation(GLuint stateVBO, size_t particlesCount) : m_stateVBO(stateVBO), m_particlesCount(particlesCount)
 	{
 		cudaError_t error;
 
@@ -70,10 +76,7 @@ public:
 		error = cudaGraphicsResourceGetMappedPointer(&d_stateVector, &stateSize, m_resource);
 		assert(error == cudaSuccess);
 
-		assert(m_particles * 3 * (sizeof(float) * 3) == stateSize);
-
-		m_devicePositions = reinterpret_cast<float3*>(d_stateVector);
-		m_deviceVelocities = reinterpret_cast<float3*>(d_stateVector) + m_particles;
+		m_deviceParticles = reinterpret_cast<SParticle*>(d_stateVector);
 	}
 
 	virtual ~CSimulation() override
@@ -88,9 +91,9 @@ public:
 	virtual void UpdateState(float dt) override
 	{
 		dim3 blockDim(128);
-		dim3 gridDim((unsigned(m_particles) - 1) / blockDim.x + 1);
+		dim3 gridDim((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
 
-		processParticles <<<gridDim, blockDim >>> (m_devicePositions, m_deviceVelocities, m_particles, dt);
+		processParticles <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, dt);
 	}
 
 	virtual float GetParticleRadius() const override
@@ -99,7 +102,7 @@ public:
 	}
 };
 
-std::unique_ptr<ISimulation> ISimulation::CreateInstance(GLuint stateVBO, size_t particles)
+std::unique_ptr<ISimulation> ISimulation::CreateInstance(GLuint stateVBO, size_t particlesCount)
 {
-	return std::make_unique<CSimulation>(stateVBO, particles);
+	return std::make_unique<CSimulation>(stateVBO, particlesCount);
 }

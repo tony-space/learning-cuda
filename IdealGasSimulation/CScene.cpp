@@ -9,26 +9,36 @@
 #include <cmath>
 
 
-static const size_t kMolecules = 1024;
+static const size_t kMolecules = 4096;
+
+struct SParticle
+{
+	glm::vec3 pos;
+	glm::vec3 vel;
+};
 
 CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl")
 {
-	std::vector<glm::vec3> positions(kMolecules);
-	std::vector<glm::vec3> velocities(kMolecules);
+	std::vector<SParticle> particles(kMolecules);
 	std::vector<glm::vec3> colors(kMolecules);
-	for (auto& p : positions)
-		p = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
 
-	for (auto& v : velocities)
-		v = glm::sphericalRand(1.0f) * glm::linearRand(0.0f, 1.0f);
+	for (auto& p : particles)
+	{
+		p.pos = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
+		p.vel = glm::sphericalRand(1.0f) * glm::linearRand(0.0f, 0.4f);
+	}
 
 	for (auto& c : colors)
 		c = glm::linearRand(glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f, 1.0f, 1.0f));
 
 	std::vector<glm::vec3> bufferData;
 	bufferData.reserve(kMolecules * 3);
-	bufferData.insert(bufferData.end(), positions.begin(), positions.end());
-	bufferData.insert(bufferData.end(), velocities.begin(), velocities.end());
+	for (const auto& p : particles)
+	{
+		bufferData.push_back(p.pos);
+		bufferData.push_back(p.vel);
+	}
+
 	bufferData.insert(bufferData.end(), colors.begin(), colors.end());
 
 
@@ -40,7 +50,6 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	auto err = glGetError();
 	assert(err == GL_NO_ERROR);
 
-	//m_cudaSim = std::make_unique<CSimulation>(m_moleculesVBO, kMolecules);
 	m_cudaSim = ISimulation::CreateInstance(m_moleculesVBO, kMolecules);
 }
 
@@ -72,7 +81,7 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
-	glVertexPointer(3, GL_FLOAT, 0, (void*)0);
+	glVertexPointer(3, GL_FLOAT, sizeof(SParticle), (void*)0);
 	glColorPointer(3, GL_FLOAT, 0, (void*)(kMolecules * 2 * sizeof(glm::vec3)));
 	glDrawArrays(GL_POINTS, 0, kMolecules);
 	glDisableClientState(GL_VERTEX_ARRAY);

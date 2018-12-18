@@ -10,6 +10,7 @@
 
 
 static const size_t kMolecules = 4096;
+static const float kParticleRad = 0.01f;
 
 struct SParticle
 {
@@ -50,7 +51,7 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	auto err = glGetError();
 	assert(err == GL_NO_ERROR);
 
-	m_cudaSim = ISimulation::CreateInstance(m_moleculesVBO, kMolecules);
+	m_cudaSim = ISimulation::CreateInstance(m_moleculesVBO, kMolecules, kParticleRad);
 }
 
 CScene::~CScene()
@@ -73,7 +74,7 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 	auto smartSwitcher = m_spriteShader.Activate();
 
 	static const glm::vec4 lightDirection = glm::normalize(glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
-	m_spriteShader.SetUniform("pointRadius", m_cudaSim->GetParticleRadius());
+	m_spriteShader.SetUniform("pointRadius", kParticleRad);
 	m_spriteShader.SetUniform("pointScale", windowHeight / tanf(fov / 2.0f *  float(M_PI) / 180.0f));
 	m_spriteShader.SetUniform("lightDir", (mvm * lightDirection).xyz);
 

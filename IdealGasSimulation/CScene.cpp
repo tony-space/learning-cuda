@@ -9,8 +9,8 @@
 #include <cmath>
 
 
-static const size_t kMolecules = 4096;
-static const float kParticleRad = 0.01f;
+static const size_t kMolecules = 128;
+static const float kParticleRad = 0.025f;
 
 struct SParticle
 {
@@ -25,7 +25,7 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 
 	for (auto& p : particles)
 	{
-		p.pos = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f), glm::vec3(0.5f, 0.5f, 0.5f));
+		p.pos = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f) + kParticleRad, glm::vec3(0.5f, 0.5f, 0.5f) - kParticleRad);
 		p.vel = glm::sphericalRand(1.0f) * glm::linearRand(0.0f, 0.4f);
 	}
 

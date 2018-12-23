@@ -2,6 +2,7 @@
 #include <GL\glew.h>
 #include <GL\wglew.h>
 #include <GL\freeglut.h>
+#include <algorithm>
 #include <memory>
 #include <chrono>
 #include <sstream>
@@ -45,6 +46,7 @@ void DisplayFunc()
 	g_lastFrameTime = now;
 
 	g_deltaTime = float(std::chrono::duration_cast<std::chrono::nanoseconds>(deltaTime).count()) * 1e-9f;
+	g_deltaTime = std::min(g_deltaTime, 1.0f);
 
 	static float __timeCounter = 0.0f;
 	__timeCounter += g_deltaTime;

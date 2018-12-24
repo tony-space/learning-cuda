@@ -290,7 +290,7 @@ public:
 		assert(error == cudaSuccess);
 	}
 
-	virtual void UpdateState(float dt) override
+	virtual float UpdateState(float dt) override
 	{
 #pragma warning(push)
 #pragma warning(disable : 4244)
@@ -336,8 +336,7 @@ public:
 			break;
 		}
 
-		
-
+		return dt;
 #pragma warning(pop)
 	}
 };

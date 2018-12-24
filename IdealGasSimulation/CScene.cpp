@@ -9,8 +9,8 @@
 #include <cmath>
 
 
-static const size_t kMolecules = 128;
-static const float kParticleRad = 0.025f;
+static const size_t kMolecules = 16384;
+static const float kParticleRad = 0.00390625f;
 
 struct SParticle
 {
@@ -66,7 +66,9 @@ CScene::~CScene()
 
 void CScene::UpdateState(float dt)
 {
-	m_cudaSim->UpdateState(dt);
+	int counter = 0;
+	while (dt > 0 && counter++ < 10)
+		dt -= m_cudaSim->UpdateState(dt);
 }
 
 void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)

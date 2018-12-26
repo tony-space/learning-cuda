@@ -33,63 +33,43 @@ struct SPlane
 	}
 };
 
-struct SParticleParticleCollision
+struct SObjectsCollision
 {
-	//first particle index
-	size_t particle1 = size_t(-1);
-	//second particle index
-	size_t particle2 = size_t(-1);
+	enum class CollisionType
+	{
+		None,
+		ParticleToParticle,
+		ParticleToPlane
+	};
+
+	size_t object1 = size_t(-1);
+	size_t object2 = size_t(-1);
 	//predicted time interval when collision will happen
 	float predictedTime = INFINITY;
 
+	CollisionType collisionType = CollisionType::None;
+
 	struct Comparator
 	{
-		__device__ inline SParticleParticleCollision operator()(const SParticleParticleCollision& x, const SParticleParticleCollision& y)
+		__device__ inline SObjectsCollision operator()(const SObjectsCollision& x, const SObjectsCollision& y)
 		{
 			return x.predictedTime < y.predictedTime ? x : y;
 		}
 	};
 
-	__device__ inline void AnalyzeAndApply(size_t a, size_t b, float time)
+	__device__ inline void AnalyzeAndApply(const size_t obj1, const size_t obj2, float time, CollisionType type)
 	{
 		if (time < 0.0f) return;
 		if (time > predictedTime) return;
 
-		particle1 = a;
-		particle2 = b;
+		object1 = obj1;
+		object2 = obj2;
 		predictedTime = time;
+		collisionType = type;
 	}
 };
 
-struct SParticlePlaneCollision
-{
-	//first particle index
-	size_t particle = size_t(-1);
-	//second particle index
-	size_t plane = size_t(-1);
-	//predicted time interval when collision will happen
-	float predictedTime = INFINITY;
-
-	struct Comparator
-	{
-		__device__ inline SParticlePlaneCollision operator()(const SParticlePlaneCollision& x, const SParticlePlaneCollision& y)
-		{
-			return x.predictedTime < y.predictedTime ? x : y;
-		}
-	};
-
-	__device__ inline void AnalyzeAndApply(size_t _particle, size_t _plane, float time)
-	{
-		if (time < 0.0f) return;
-		if (time > predictedTime) return;
-
-		particle = _particle;
-		plane = _plane;
-		predictedTime = time;
-	}
-};
-
-__global__ void predictParticleParticleCollisionsKernel(const SParticle particles[], const size_t particlesCount, const float particlesRadius, SParticleParticleCollision out[])
+__global__ void predictParticleParticleCollisionsKernel(const SParticle particles[], const size_t particlesCount, const float particlesRadius, SObjectsCollision out[])
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particlesCount)
@@ -98,7 +78,7 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticle particle
 	SParticle self = particles[threadId];
 
 
-	SParticleParticleCollision earliestCollision;
+	SObjectsCollision earliestCollision;
 
 	for (size_t i = 0; i < particlesCount; ++i)
 	{
@@ -147,8 +127,8 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticle particle
 		float dt1 = (-b - sqrtD) / (2.0f * a);
 		float dt2 = (-b + sqrtD) / (2.0f * a);
 
-		earliestCollision.AnalyzeAndApply(threadId, i, dt1);
-		earliestCollision.AnalyzeAndApply(threadId, i, dt2);
+		earliestCollision.AnalyzeAndApply(threadId, i, dt1, SObjectsCollision::CollisionType::ParticleToParticle);
+		earliestCollision.AnalyzeAndApply(threadId, i, dt2, SObjectsCollision::CollisionType::ParticleToParticle);
 	}
 
 	out[threadId] = earliestCollision;
@@ -160,7 +140,7 @@ __global__ void predictParticlePlaneCollisionsKernel(
 	const float particlesRadius,
 	const SPlane planes[],
 	const size_t planesCount,
-	SParticlePlaneCollision out[])
+	SObjectsCollision inOut[])
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particlesCount)
@@ -169,7 +149,7 @@ __global__ void predictParticlePlaneCollisionsKernel(
 	SParticle self = particles[threadId];
 
 
-	SParticlePlaneCollision earliestCollision;
+	SObjectsCollision earliestCollision = inOut[threadId];
 
 	for (size_t i = 0; i < planesCount; ++i)
 	{
@@ -181,10 +161,10 @@ __global__ void predictParticlePlaneCollisionsKernel(
 			continue;
 
 		auto time = -plane.Distance(self, particlesRadius) / velProjection;
-		earliestCollision.AnalyzeAndApply(threadId, i, time);
+		earliestCollision.AnalyzeAndApply(threadId, i, time, SObjectsCollision::CollisionType::ParticleToPlane);
 	}
 
-	out[threadId] = earliestCollision;
+	inOut[threadId] = earliestCollision;
 }
 
 __global__ void moveParticlesKernel(SParticle particles[], const size_t particlesCount, const float dt)
@@ -199,15 +179,15 @@ __global__ void moveParticlesKernel(SParticle particles[], const size_t particle
 	particles[threadId] = self;
 }
 
-__global__ void resolveParticle2ParticleCollision(SParticle particles[], const size_t particlesCount, const size_t p1, const size_t p2)
+__global__ void resolveParticle2ParticleCollision(SParticle* p1, SParticle* p2)
 {
-	if (p1 >= particlesCount)
+	if (p1 == nullptr)
 		return;
-	if (p2 >= particlesCount)
+	if (p2 == nullptr)
 		return;
 
-	SParticle a = particles[p1];
-	SParticle b = particles[p2];
+	SParticle a = *p1;
+	SParticle b = *p2;
 
 	auto centerOfMassVel = (a.vel + b.vel) / 2.0f;
 	auto v1 = a.vel - centerOfMassVel;
@@ -221,18 +201,18 @@ __global__ void resolveParticle2ParticleCollision(SParticle particles[], const s
 	a.vel = v1 + centerOfMassVel;
 	b.vel = v2 + centerOfMassVel;
 
-	particles[p1] = a;
-	particles[p2] = b;
+	*p1 = a;
+	*p2 = b;
 }
 
-__global__ void resolveParticle2PlaneCollision(SParticle particles[], const size_t particlesCount, const SPlane planes[], const size_t planesCount, const size_t particle, const size_t plane)
+__global__ void resolveParticle2PlaneCollision(SParticle* particle, SPlane* plane)
 {
-	if (particle >= particlesCount)
+	if (particle == nullptr)
 		return;
-	if (plane >= planesCount)
+	if (plane == nullptr)
 		return;
 
-	particles[particle].vel = reflect(particles[particle].vel, planes[plane].normal);
+	particle->vel = reflect(particle->vel, plane->normal);
 }
 
 class CSimulation : public ISimulation
@@ -246,8 +226,7 @@ private:
 	SParticle* m_deviceParticles;
 	thrust::device_vector<SPlane> m_devicePlanes;
 
-	thrust::device_vector<SParticleParticleCollision> m_part2PartCollisions;
-	thrust::device_vector<SParticlePlaneCollision> m_part2PlaneCollisions;
+	thrust::device_vector<SObjectsCollision> m_collisions;
 
 public:
 	CSimulation(GLuint stateVBO, size_t particlesCount, float particleRadius) : m_stateVBO(stateVBO), m_particlesCount(particlesCount), m_particleRadius(particleRadius)
@@ -276,8 +255,7 @@ public:
 		hostPlanes.push_back(SPlane(make_float3(0.0, 0.0, -1.0), -0.5));
 		m_devicePlanes = hostPlanes;
 
-		m_part2PartCollisions.resize(m_particlesCount);
-		m_part2PlaneCollisions.resize(m_particlesCount);
+		m_collisions.resize(m_particlesCount);
 	}
 
 	virtual ~CSimulation() override
@@ -297,44 +275,30 @@ public:
 		dim3 blockDim(32 * 32);
 		dim3 gridDim((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
 
-		predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, thrust::raw_pointer_cast(m_part2PartCollisions.data()));
-		predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, thrust::raw_pointer_cast(m_devicePlanes.data()), m_devicePlanes.size(), thrust::raw_pointer_cast(m_part2PlaneCollisions.data()));
-		
-		auto earilestPart2PartCollision = thrust::reduce(m_part2PartCollisions.begin(), m_part2PartCollisions.end(), SParticleParticleCollision(), SParticleParticleCollision::Comparator());
-		auto earilestPart2PlaneCollision = thrust::reduce(m_part2PlaneCollisions.begin(), m_part2PlaneCollisions.end(), SParticlePlaneCollision(), SParticlePlaneCollision::Comparator());
+		predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, thrust::raw_pointer_cast(m_collisions.data()));
+		predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, thrust::raw_pointer_cast(m_devicePlanes.data()), m_devicePlanes.size(), thrust::raw_pointer_cast(m_collisions.data()));
 
-		enum PredictionResult
-		{
-			NoCollisions,
-			Particle2Particle,
-			Particle2Plane
-		} predResult;
+		auto earilestCollision = thrust::reduce(m_collisions.begin(), m_collisions.end(), SObjectsCollision(), SObjectsCollision::Comparator());
 
-		if (dt < earilestPart2PartCollision.predictedTime && dt < earilestPart2PlaneCollision.predictedTime)
-			predResult = NoCollisions;
-		else if (earilestPart2PartCollision.predictedTime < dt && earilestPart2PartCollision.predictedTime < earilestPart2PlaneCollision.predictedTime)
+		bool detected = false;
+		if (earilestCollision.predictedTime < dt)
 		{
-			predResult = Particle2Particle;
-			dt = earilestPart2PartCollision.predictedTime;
+			dt = earilestCollision.predictedTime;
+			detected = true;
 		}
-		else if (earilestPart2PlaneCollision.predictedTime < dt && earilestPart2PlaneCollision.predictedTime < earilestPart2PartCollision.predictedTime)
-		{
-			predResult = Particle2Plane;
-			dt = earilestPart2PlaneCollision.predictedTime;
-		}
-		else
-			throw std::exception();
 
 		moveParticlesKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, dt);
-		switch (predResult)
-		{
-		case Particle2Particle:
-			resolveParticle2ParticleCollision <<<1, 1 >>> (m_deviceParticles, m_particlesCount, earilestPart2PartCollision.particle1, earilestPart2PartCollision.particle2);
-			break;
-		case Particle2Plane:
-			resolveParticle2PlaneCollision <<<1, 1 >>> (m_deviceParticles, m_particlesCount, thrust::raw_pointer_cast(m_devicePlanes.data()), m_devicePlanes.size(), earilestPart2PlaneCollision.particle, earilestPart2PlaneCollision.plane);
-			break;
-		}
+
+		if (detected)
+			switch (earilestCollision.collisionType)
+			{
+			case SObjectsCollision::CollisionType::ParticleToParticle:
+				resolveParticle2ParticleCollision << <1, 1 >> > (m_deviceParticles + earilestCollision.object1, m_deviceParticles + earilestCollision.object2);
+				break;
+			case SObjectsCollision::CollisionType::ParticleToPlane:
+				resolveParticle2PlaneCollision << <1, 1 >> > (m_deviceParticles + earilestCollision.object1, thrust::raw_pointer_cast(m_devicePlanes.data()) + earilestCollision.object2);
+				break;
+			}
 
 		return dt;
 #pragma warning(pop)

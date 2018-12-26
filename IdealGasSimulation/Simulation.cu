@@ -114,7 +114,11 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticle particle
 		//if particles somehow have already penetrated each other (e.g. due to incorrect position generation), don't check collision.
 		//It's just a check for invalid states
 		if (c < 0.0f)
-			continue;
+		{
+			earliestCollision.AnalyzeAndApply(threadId, i, 0.0f, SObjectsCollision::CollisionType::ParticleToParticle);
+			break;
+			//continue;
+		}
 
 		//if particles ways never intersect
 		if (discriminant < 0.0f)
@@ -160,7 +164,7 @@ __global__ void predictParticlePlaneCollisionsKernel(
 		if (velProjection >= 0.0f)
 			continue;
 
-		auto time = -plane.Distance(self, particlesRadius) / velProjection;
+		auto time = max(-plane.Distance(self, particlesRadius) / velProjection, 0.0f);
 		earliestCollision.AnalyzeAndApply(threadId, i, time, SObjectsCollision::CollisionType::ParticleToPlane);
 	}
 
@@ -175,6 +179,7 @@ __global__ void moveParticlesKernel(SParticle particles[], const size_t particle
 
 	SParticle self = particles[threadId];
 	self.pos += self.vel * dt;
+	self.vel.y -= 1.0f * dt;
 
 	particles[threadId] = self;
 }
@@ -195,8 +200,8 @@ __global__ void resolveParticle2ParticleCollision(SParticle* p1, SParticle* p2)
 
 	auto planeNormal = normalize(b.pos - a.pos);
 
-	v1 = reflect(v1, planeNormal);
-	v2 = reflect(v2, planeNormal);
+	v1 = reflect(v1, planeNormal) * 0.98f;
+	v2 = reflect(v2, planeNormal) * 0.98f;
 
 	a.vel = v1 + centerOfMassVel;
 	b.vel = v2 + centerOfMassVel;
@@ -212,7 +217,7 @@ __global__ void resolveParticle2PlaneCollision(SParticle* particle, SPlane* plan
 	if (plane == nullptr)
 		return;
 
-	particle->vel = reflect(particle->vel, plane->normal);
+	particle->vel = reflect(particle->vel, plane->normal) * 0.98f;
 }
 
 class CSimulation : public ISimulation

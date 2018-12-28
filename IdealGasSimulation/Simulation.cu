@@ -69,7 +69,7 @@ struct SObjectsCollision
 	}
 };
 
-__global__ void predictParticleParticleCollisionsKernel(const SParticle particles[], const size_t particlesCount, const float particlesRadius, SObjectsCollision out[])
+__global__ void predictParticleParticleCollisionsKernel(const SParticle* __restrict__ particles, const size_t particlesCount, const float particlesRadius, SObjectsCollision* __restrict__ out)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particlesCount)
@@ -77,12 +77,11 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticle particle
 
 	SParticle self = particles[threadId];
 
-
 	SObjectsCollision earliestCollision;
 
-	for (size_t i = 0; i < particlesCount; ++i)
+	for (size_t i = threadId + 1; i < particlesCount; ++i)
 	{
-		if (i == threadId) continue;
+		//if (i == threadId) continue;
 		SParticle other = particles[i];
 
 		//Let's solve a quadratic equation to predict the exact collision time.
@@ -139,12 +138,12 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticle particle
 }
 
 __global__ void predictParticlePlaneCollisionsKernel(
-	const SParticle particles[],
+	const SParticle* __restrict__ particles,
 	const size_t particlesCount,
 	const float particlesRadius,
-	const SPlane planes[],
+	const SPlane* __restrict__ planes,
 	const size_t planesCount,
-	SObjectsCollision inOut[])
+	SObjectsCollision* __restrict__ inOut)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particlesCount)
@@ -171,7 +170,7 @@ __global__ void predictParticlePlaneCollisionsKernel(
 	inOut[threadId] = earliestCollision;
 }
 
-__global__ void moveParticlesKernel(SParticle particles[], const size_t particlesCount, const float dt)
+__global__ void moveParticlesKernel(SParticle* __restrict__ particles, const size_t particlesCount, const float dt)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particlesCount)

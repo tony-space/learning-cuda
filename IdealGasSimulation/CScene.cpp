@@ -70,7 +70,7 @@ CScene::~CScene()
 void CScene::UpdateState(float dt)
 {
 	int counter = 0;
-	while (dt > 0 && counter++ < 10)
+	while (dt > 0 && counter++ < 32)
 		dt -= m_cudaSim->UpdateState(dt);
 }
 

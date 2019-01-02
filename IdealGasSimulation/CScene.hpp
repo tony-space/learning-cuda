@@ -2,7 +2,9 @@
 
 #include "CShaderProgram.hpp"
 #include "Simulation.hpp"
+
 #include <memory>
+#include <cuda_gl_interop.h>
 
 class CScene
 {
@@ -16,7 +18,7 @@ public:
 private:
 	CShaderProgram m_spriteShader;
 	GLuint m_moleculesVBO;
+	cudaGraphicsResource_t m_resource;
 
-	//std::unique_ptr<CSimulation> m_cudaSim;
 	std::unique_ptr<ISimulation> m_cudaSim;
 };

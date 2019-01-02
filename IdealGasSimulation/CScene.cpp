@@ -54,12 +54,32 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	auto err = glGetError();
 	assert(err == GL_NO_ERROR);
 
-	m_cudaSim = ISimulation::CreateInstance(m_moleculesVBO, kMolecules, kParticleRad);
+	cudaError_t error;
+
+	error = cudaGraphicsGLRegisterBuffer(&m_resource, m_moleculesVBO, cudaGraphicsRegisterFlagsNone);
+	assert(error == cudaSuccess);
+
+	error = cudaGraphicsMapResources(1, &m_resource);
+	assert(error == cudaSuccess);
+
+	void* d_stateVector;
+	size_t stateSize;
+	error = cudaGraphicsResourceGetMappedPointer(&d_stateVector, &stateSize, m_resource);
+	assert(error == cudaSuccess);
+
+	m_cudaSim = ISimulation::CreateInstance(d_stateVector, kMolecules, kParticleRad);
 }
 
 CScene::~CScene()
 {
 	m_cudaSim.reset();
+
+	cudaError_t error;
+	error = cudaGraphicsUnmapResources(1, &m_resource);
+	assert(error == cudaSuccess);
+
+	error = cudaGraphicsUnregisterResource(m_resource);
+	assert(error == cudaSuccess);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDeleteBuffers(1, &m_moleculesVBO);

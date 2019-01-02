@@ -2,7 +2,6 @@
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <cuda_gl_interop.h>
 #include <cassert>
 #include <helper_math.h>
 #include <thrust/device_vector.h>
@@ -222,34 +221,17 @@ __global__ void resolveParticle2PlaneCollision(SParticle* particle, SPlane* plan
 class CSimulation : public ISimulation
 {
 private:
-	const GLuint m_stateVBO;
 	const size_t m_particlesCount;
 	const float m_particleRadius;
 
-	cudaGraphicsResource_t m_resource;
 	SParticle* m_deviceParticles;
 	thrust::device_vector<SPlane> m_devicePlanes;
 
 	thrust::device_vector<SObjectsCollision> m_collisions;
 
 public:
-	CSimulation(GLuint stateVBO, size_t particlesCount, float particleRadius) : m_stateVBO(stateVBO), m_particlesCount(particlesCount), m_particleRadius(particleRadius)
+	CSimulation(void* particles, size_t particlesCount, float particleRadius) : m_deviceParticles(reinterpret_cast<SParticle*>(particles)), m_particlesCount(particlesCount), m_particleRadius(particleRadius)
 	{
-		cudaError_t error;
-
-		error = cudaGraphicsGLRegisterBuffer(&m_resource, m_stateVBO, cudaGraphicsRegisterFlagsNone);
-		assert(error == cudaSuccess);
-
-		error = cudaGraphicsMapResources(1, &m_resource);
-		assert(error == cudaSuccess);
-
-		void* d_stateVector;
-		size_t stateSize;
-		error = cudaGraphicsResourceGetMappedPointer(&d_stateVector, &stateSize, m_resource);
-		assert(error == cudaSuccess);
-
-		m_deviceParticles = reinterpret_cast<SParticle*>(d_stateVector);
-
 		thrust::host_vector<SPlane> hostPlanes;
 		hostPlanes.push_back(SPlane(make_float3(1.0, 0.0, 0.0), -0.5));
 		hostPlanes.push_back(SPlane(make_float3(-1.0, 0.0, 0.0), -0.5));
@@ -264,12 +246,6 @@ public:
 
 	virtual ~CSimulation() override
 	{
-		cudaError_t error;
-		error = cudaGraphicsUnmapResources(1, &m_resource);
-		assert(error == cudaSuccess);
-
-		error = cudaGraphicsUnregisterResource(m_resource);
-		assert(error == cudaSuccess);
 	}
 
 	virtual float UpdateState(float dt) override
@@ -309,7 +285,7 @@ public:
 	}
 };
 
-std::unique_ptr<ISimulation> ISimulation::CreateInstance(GLuint stateVBO, size_t particlesCount, float particleRadius)
+std::unique_ptr<ISimulation> ISimulation::CreateInstance(void* particles, size_t particlesCount, float particleRadius)
 {
-	return std::make_unique<CSimulation>(stateVBO, particlesCount, particleRadius);
+	return std::make_unique<CSimulation>(particles, particlesCount, particleRadius);
 }

@@ -6,7 +6,7 @@
 #include <helper_math.h>
 #include <thrust/device_vector.h>
 
-#include "Simulation.hpp"
+#include "../include/Simulation.hpp"
 
 static constexpr float kSimPrecision = 1e-16f;
 

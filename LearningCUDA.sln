@@ -21,6 +21,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleRayTracer", "SimpleRa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasSimulation", "IdealGasSimulation\IdealGasSimulation.vcxproj", "{38804A48-652A-4C03-9C2F-2237ED237E02}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ElasticParticlesModel", "ElasticParticlesModel\ElasticParticlesModel.vcxproj", "{5563DAD8-697A-4734-A4E7-234B59A5B70D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -83,6 +85,12 @@ Global
 		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.ActiveCfg = Release|x64
 		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.Build.0 = Release|x64
 		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x86.ActiveCfg = Release|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x64.ActiveCfg = Debug|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x64.Build.0 = Debug|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x86.ActiveCfg = Debug|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x64.ActiveCfg = Release|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x64.Build.0 = Release|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

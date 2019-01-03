@@ -7,18 +7,18 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
-constexpr int kBlocks = 5;
-constexpr int kWarpsPerBlock = 5;
-constexpr size_t kNumbers = kBlocks * kWarpsPerBlock * 32;
-constexpr int kDefaultValue = INT_MAX;
+constexpr size_t kNumbers = 2000;
+//constexpr int kDefaultValue = INT_MAX;
+constexpr int kDefaultValue = 0;
 
-__inline__ __device__ int warpReduce(int val, int size)
+inline __device__ int warpReduce(int val, int size)
 {
 	size = min(size, warpSize);
 	for (int offset = size / 2; offset > 0; offset >>= 1)
 	{
 		auto neighbour = __shfl_down_sync(0xFFFFFFFF, val, offset);
-		val = min(val, neighbour);
+		//val = min(val, neighbour);
+		val += neighbour;
 	}
 	return val;
 }
@@ -33,29 +33,32 @@ __global__ void reduceKernel(int* values, size_t size)
 	auto gridSize = blockDim.x * gridDim.x;
 	
 	extern __shared__ int cache[];
-	auto cacheSize = blockDim.x / warpSize; //equals to amount of warps in blocks
+	int cacheSize = blockDim.x / warpSize; //equals to amount of warps in blocks
 
 	if (threadId < size)
 		val = values[threadId];
 	if (threadId + gridSize < size)
-		val = min(val, values[threadId + gridSize]);
+		//val = min(val, values[threadId + gridSize]);
+		val = val + values[threadId + gridSize];
 
 	val = warpReduce(val, size);
 	if (laneId == 0)
 		cache[warpId] = val;
 
-	if (threadIdx.x >= cacheSize / 2 + cacheSize % 2)
+	int threads = (cacheSize - 1 ) / 2 + 1;
+	if (threadIdx.x >= threads)
 		return;
 	__syncthreads();
 
-	for (int threads = cacheSize / 2 + cacheSize % 2; ; threads = threads / 2 + threads % 2)
+	for (;; threads = (cacheSize - 1) / 2 + 1)
 	{
 		if (threadIdx.x >= threads)
 			return;
 
 		auto x = cache[threadIdx.x];
 		auto y = threadIdx.x + threads >= cacheSize ? kDefaultValue : cache[threadIdx.x + threads];
-		cache[threadIdx.x] = min(x, y);
+		//cache[threadIdx.x] = min(x, y);
+		cache[threadIdx.x] = x + y;
 		cacheSize = threads;
 
 		if (threads == 1)
@@ -67,21 +70,32 @@ __global__ void reduceKernel(int* values, size_t size)
 	values[blockIdx.x] = cache[0];
 }
 
+inline int divCeil(int a, int b)
+{
+	return (a - 1) / b + 1;
+}
+
 int main(int argc, char** argv)
 {
 	srand(42);
 	thrust::host_vector<int> hostNumbers;
 	hostNumbers.reserve(kNumbers);
 	for (size_t i = 0; i < kNumbers; ++i)
-		hostNumbers.push_back(rand());
+		hostNumbers.push_back(rand() % 50);
 
-	int controlResult = *std::min_element(hostNumbers.begin(), hostNumbers.end());
+	//int controlResult = *std::min_element(hostNumbers.begin(), hostNumbers.end());
+	int controlResult = std::accumulate(hostNumbers.begin(), hostNumbers.end(), 0);
 	printf("Control result: %d\r\n", controlResult);
+
+	int pairs = divCeil(kNumbers, 2);
+	int warps = divCeil(pairs, 32);
+	dim3 blockDim(min(1024, warps * 32));
+	dim3 gridSize(divCeil(pairs, blockDim.x));
 
 	thrust::device_vector<int> deviceNumbers = hostNumbers;
 
-	reduceKernel <<<kBlocks, kWarpsPerBlock * 32, kWarpsPerBlock >>> (thrust::raw_pointer_cast(deviceNumbers.data()), kNumbers);
-	reduceKernel <<<1, 1 * 32, 1 >>> (thrust::raw_pointer_cast(deviceNumbers.data()), kBlocks);
+	reduceKernel <<<gridSize, blockDim, blockDim.x / 32>>> (thrust::raw_pointer_cast(deviceNumbers.data()), kNumbers);
+	reduceKernel <<<1, gridSize.x, 1 >>> (thrust::raw_pointer_cast(deviceNumbers.data()), gridSize.x);
 
 	int result = deviceNumbers[0];
 

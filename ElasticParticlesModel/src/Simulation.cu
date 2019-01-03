@@ -228,9 +228,8 @@ private:
 	thrust::device_vector<SPlane> m_devicePlanes;
 
 	thrust::device_vector<SObjectsCollision> m_collisions;
-
 public:
-	CSimulation(void* particles, size_t particlesCount, float particleRadius) : m_deviceParticles(reinterpret_cast<SParticle*>(particles)), m_particlesCount(particlesCount), m_particleRadius(particleRadius)
+	CSimulation(void* d_particles, size_t particlesCount, float particleRadius) : m_deviceParticles(reinterpret_cast<SParticle*>(d_particles)), m_particlesCount(particlesCount), m_particleRadius(particleRadius)
 	{
 		thrust::host_vector<SPlane> hostPlanes;
 		hostPlanes.push_back(SPlane(make_float3(1.0, 0.0, 0.0), -0.5));
@@ -252,7 +251,7 @@ public:
 	{
 #pragma warning(push)
 #pragma warning(disable : 4244)
-		dim3 blockDim(32 * 32);
+		dim3 blockDim(64);
 		dim3 gridDim((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
 
 		predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, thrust::raw_pointer_cast(m_collisions.data()));
@@ -285,7 +284,7 @@ public:
 	}
 };
 
-std::unique_ptr<ISimulation> ISimulation::CreateInstance(void* particles, size_t particlesCount, float particleRadius)
+std::unique_ptr<ISimulation> ISimulation::CreateInstance(void* d_particles, size_t particlesCount, float particleRadius)
 {
-	return std::make_unique<CSimulation>(particles, particlesCount, particleRadius);
+	return std::make_unique<CSimulation>(d_particles, particlesCount, particleRadius);
 }

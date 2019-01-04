@@ -9,7 +9,8 @@
 #include <chrono>
 
 constexpr size_t kNumbers = 704185371;
-constexpr size_t kMaxBlockSize = 512;
+//constexpr size_t kNumbers = 704181;
+constexpr size_t kMaxBlockSize = 256;
 
 constexpr int kDefaultValue = 0;
 
@@ -19,27 +20,28 @@ static inline __device__ __host__ T divCeil(T a, T b)
 	return (a - 1) / b + 1;
 }
 
-static inline __device__ int warpReduce(int val)
+template<typename T>
+static inline __device__ T warpReduce(T val)
 {
-	for (int offset = warpSize / 2; offset > 0; offset >>= 1)
+	for (auto offset = warpSize >> 1; offset > 0; offset >>= 1)
 	{
-		auto neighbour = __shfl_down_sync(0xFFFFFFFF, val, offset);
+		T neighbour = __shfl_down_sync(0xFFFFFFFF, val, offset);
 		val += neighbour;
 	}
 	return val;
 }
 
-__global__ void reduceKernel(int* values, size_t size, int* output)
+__global__ void reduceKernel(const int* __restrict__ values, size_t size, int* __restrict__ output)
 {
-	int val = kDefaultValue;
+	auto val = kDefaultValue;
 
 	auto threadId = blockDim.x * blockIdx.x + threadIdx.x;
-	auto warpId = threadIdx.x / warpSize;
+	auto warpId = threadIdx.x / unsigned(warpSize);
 	auto laneId = threadIdx.x % warpSize;
 	auto gridSize = blockDim.x * gridDim.x;
 
 	extern __shared__ int cache[];
-	int cacheSize = divCeil<int>(blockDim.x, warpSize); //equals to amount of warps in blocks
+	auto cacheSize = divCeil(blockDim.x, unsigned(warpSize)); //equals to amount of warps in blocks
 
 	if (threadId < size)
 		val = values[threadId];
@@ -71,7 +73,7 @@ int main(int argc, char** argv)
 		hostNumbers.push_back(rand() % 101 - 50);
 
 	auto begin = std::chrono::high_resolution_clock::now();
-	int controlResult = std::accumulate(hostNumbers.begin(), hostNumbers.end(), 0);
+	auto controlResult = std::accumulate(hostNumbers.begin(), hostNumbers.end(), 0);
 	auto end = std::chrono::high_resolution_clock::now();
 	printf("Control result: %d\r\n", controlResult);
 	printf("Elapsed time on CPU: %.3f ms\r\n", float(std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count()) * 1e-6f);
@@ -104,7 +106,8 @@ int main(int argc, char** argv)
 		dim3 blockSize(min(kMaxBlockSize, warps * size_t(32)));
 		dim3 gridSize(divCeil(pairs, size_t(blockSize.x)));
 
-		reduceKernel <<<gridSize, blockSize, blockSize.x / 32>>> (buffer1, numbers, buffer2);
+		reduceKernel <<<gridSize, blockSize, blockSize.x / 32 * sizeof(int)>>> (buffer1, numbers, buffer2);
+		//cudaDeviceSynchronize();
 		std::swap(buffer1, buffer2);
 		numbers = gridSize.x;
 	}
@@ -124,7 +127,9 @@ int main(int argc, char** argv)
 	assert(status == cudaSuccess);
 
 	printf("Elapsed time on GPU: %.3f ms\r\n", ms);
-	printf("Result: %d \r\n", result);
+	printf("Result: %d\r\n", result);
+	deviceNumbers = hostNumbers;
+	printf("Result2: %d\r\n", thrust::reduce(deviceNumbers.begin(), deviceNumbers.end()));
 
 	status = cudaEventDestroy(stop);
 	assert(status == cudaSuccess);

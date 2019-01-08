@@ -2,10 +2,10 @@
 #include <glm/gtc/random.hpp>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
-#include "Simulation.hpp"
+#include "ISimulation.hpp"
 
-static const size_t kMolecules = 256;
-static const float kParticleRad = 0.04f;
+static const size_t kMolecules = 4096;
+static const float kParticleRad = 0.002f;
 
 struct SParticle
 {
@@ -24,14 +24,24 @@ int main(int argc, char** argv)
 	}
 
 	thrust::device_vector<SParticle> d_particles(particles);
-	auto sim = ISimulation::CreateInstance(thrust::raw_pointer_cast(d_particles.data()), kMolecules, kParticleRad);
+	auto sim = ISimulation::CreateInstance(d_particles.data().get(), kMolecules, kParticleRad);
 
-	constexpr float kEndTime = 10.0f;
-	for (float time = 0.0f; time <= kEndTime;)
-	{
-		float simulatedTime = sim->UpdateState(1.0f);
-		time += simulatedTime;
-	}
+	sim->UpdateState(1.0f);
+	sim->UpdateState(1.0f);
+	sim->UpdateState(1.0f);
+	sim->UpdateState(1.0f);
+	sim->UpdateState(1.0f);
+
+	//constexpr float kEndTime = 10.0f;
+	//for (float time = 0.0f; time <= kEndTime;)
+	//{
+	//	auto simulatedTime = sim->UpdateState(1.0f);
+	//	auto lastTime = int(std::round(time * 10.0f));
+	//	time += simulatedTime;
+	//	auto current = int(std::round(time * 10.0f));
+	//	if (current > lastTime)
+	//		printf("%.1f\n", time);
+	//}
 
 	return 0;
 }

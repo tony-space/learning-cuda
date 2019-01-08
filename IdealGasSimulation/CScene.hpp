@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CShaderProgram.hpp"
-#include "Simulation.hpp"
+#include "ISimulation.hpp"
 
 #include <memory>
 #include <cuda_gl_interop.h>

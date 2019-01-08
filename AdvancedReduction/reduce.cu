@@ -4,7 +4,7 @@
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
-constexpr size_t kMaxBlockSize = 256;
+constexpr size_t kMaxReductionBlockSize = 256;
 
 constexpr int kDefaultValue = 0;
 
@@ -62,7 +62,7 @@ void cudaReduce(const std::vector<float>& data)
 {
 	auto totalNumbers = data.size();
 	thrust::device_vector<float> deviceNumbers(data.data(), data.data() + data.size());
-	thrust::device_vector<float> intermediate(divCeil(divCeil(totalNumbers, size_t(2)), kMaxBlockSize));
+	thrust::device_vector<float> intermediate(divCeil(divCeil(totalNumbers, size_t(2)), kMaxReductionBlockSize));
 	//auto x = intermediate.size();
 
 	cudaError_t status;
@@ -86,7 +86,7 @@ void cudaReduce(const std::vector<float>& data)
 	{
 		size_t pairs = divCeil(numbers, size_t(2));
 		size_t warps = divCeil(pairs, size_t(32));
-		dim3 blockSize(unsigned(min(kMaxBlockSize, warps * size_t(32))));
+		dim3 blockSize(unsigned(min(kMaxReductionBlockSize, warps * size_t(32))));
 		dim3 gridSize(unsigned(divCeil(pairs, size_t(blockSize.x))));
 
 		reduceKernel <<<gridSize, blockSize, blockSize.x / 32 * sizeof(float)>>> (buffer1, numbers, buffer2);

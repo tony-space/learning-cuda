@@ -4,9 +4,8 @@
 #include <vector>
 #include <chrono>
 #include <cstdint>
+#include <cassert>
 
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
 
 constexpr char* kCacheName = "randcache.bin";
 constexpr int64_t kNumbers = 9ll * 1024ll * 1024ll * 1024ll / 4ll;

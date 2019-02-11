@@ -16,7 +16,7 @@ static float g_windowHeight = 1.0f;
 
 
 std::unique_ptr<CScene> g_scene;
-glm::vec4 g_camera = glm::vec4(0.0f, 0.0f, 0.0f, 1.5f);
+glm::vec4 g_camera = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 glm::vec4 g_cameraVelocity;
 glm::vec2 g_prevMouseState;
 glm::vec2 g_mouseDelta;
@@ -63,7 +63,7 @@ void DisplayFunc()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	static const float mass = 1.0f;
-	static const float stiffness = 2.0f;
+	static const float stiffness = 0.5f;
 	static const float damp = 5.0f;
 	auto force = -glm::vec2(g_mouseDelta.y, g_mouseDelta.x) * stiffness - g_cameraVelocity.xy * damp;
 	auto accel = force / mass;
@@ -98,6 +98,18 @@ void MouseFunc(int button, int state, int x, int y)
 			g_moveCamera = false;
 		else if (state == GLUT_DOWN)
 			g_moveCamera = true;
+	}
+}
+
+void MouseWheelFunc(int button, int dir, int x, int y)
+{
+	if (dir > 0)
+	{
+		g_camera.w *= 9.0f / 10.0f;
+	}
+	else
+	{
+		g_camera.w *= 10.0f / 9.0f;
 	}
 }
 
@@ -136,13 +148,18 @@ int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH /*| GLUT_BORDERLESS | GLUT_CAPTIONLESS*/);
-	glutInitWindowSize(1366, 768);
+	//glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH /*| GLUT_BORDERLESS | GLUT_CAPTIONLESS*/);
+	//glutInitWindowSize(1366, 768);
+	
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
+	glutInitWindowSize(1920, 1080);
+
 	glutCreateWindow("Ideal gas simulation");
 
 	glutReshapeFunc(ReshapeFunc);
 	glutDisplayFunc(DisplayFunc);
 	glutMouseFunc(MouseFunc);
+	glutMouseWheelFunc(MouseWheelFunc);
 	glutMotionFunc(MotionFunc);
 	glutPassiveMotionFunc(MotionFunc);
 	glutCloseFunc(CloseFunc);

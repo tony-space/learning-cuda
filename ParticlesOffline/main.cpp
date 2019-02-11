@@ -4,7 +4,8 @@
 #include <thrust/device_vector.h>
 #include "ISimulation.hpp"
 
-static const size_t kMolecules = 4096;
+//static const size_t kMolecules = 16384;
+static const size_t kMolecules = 128;
 static const float kParticleRad = 0.002f;
 
 struct SParticle

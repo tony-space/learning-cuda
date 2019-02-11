@@ -2,6 +2,116 @@
 #include <device_launch_parameters.h>
 #include <cassert>
 #include "CSimulation.hpp"
+#include <cub/device/device_segmented_reduce.cuh>
+
+__global__ void rebuildSprings(const SParticle* __restrict__ particles, const size_t particlesCount, const float particleRadius, bool* __restrict__ springsMat)
+{
+	auto i = blockIdx.y * blockDim.y + threadIdx.y;
+	auto j = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= particlesCount || j >= particlesCount)
+		return;
+
+	bool result = false;
+
+	auto matIndex = i * particlesCount + j;
+
+	if (i != j)
+	{
+		auto connected = springsMat[matIndex];
+		SParticle p1 = particles[i];
+		SParticle p2 = particles[j];
+
+		auto r = p1.pos - p2.pos;
+		auto magnitude = length(r);
+		auto diameter = particleRadius * 2.0f;
+		if (!connected)
+		{
+			result = magnitude < diameter;
+		}
+		else
+		{
+			result = magnitude <= diameter * 1.5f;
+		}
+	}
+
+	springsMat[matIndex] = result;
+}
+
+__global__ void computeForcesMatrix(const SParticle* __restrict__ particles, const size_t particlesCount, const float particleRadius, const bool* __restrict__ springsMat,
+	float3* __restrict__ forcesMat)
+{
+	auto i = blockIdx.y * blockDim.y + threadIdx.y;
+	auto j = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= particlesCount || j >= particlesCount)
+		return;
+
+	auto matIndex = i * particlesCount + j;
+
+	float3 result = make_float3(0.0f);
+
+	if (i != j)
+	{
+		bool connected = springsMat[matIndex];
+		SParticle p1 = particles[i];
+		SParticle p2 = particles[j];
+
+		auto r = p1.pos - p2.pos;
+		auto magnitude = length(r);
+		auto diameter = particleRadius * 2.0f;
+
+		if (!connected && magnitude > diameter)
+		{
+			constexpr float k = 3e-7f;
+			result = -k * r / (magnitude * magnitude * magnitude);
+		}
+		else
+		{
+			constexpr float stiffness = 100.0f;
+			constexpr float damp = 1.0f;
+
+			auto delta = magnitude - diameter;
+			auto v = dot(p1.vel - p2.vel, r / magnitude);
+
+			result = (-r / magnitude) * (delta * stiffness + v * damp);
+		}
+	}
+
+	forcesMat[matIndex] = result;
+}
+
+__global__ void moveParticlesKernel2(
+	SParticle* __restrict__ particles, const float3* __restrict__ forces, const size_t particlesCount, const float particleRadius,
+	const SPlane* __restrict__ planes, const size_t planesCount,
+	const float dt)
+{
+	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= particlesCount)
+		return;
+
+	SParticle self = particles[threadId];
+	float3 force = forces[threadId];
+	//force.y -= 0.1f; // gravity
+
+	//force -= 0.1f * self.vel;
+
+	self.pos += self.vel * dt;
+	self.vel += force * dt;
+
+	for (size_t i = 0; i < planesCount; ++i)
+	{
+		SPlane p = planes[i];
+		if (p.Distance(self, particleRadius) >= 0.0f)
+			continue;
+
+		if (dot(p.normal, self.vel) >= 0.0f)
+			continue;
+
+		self.vel = reflect(self.vel, p.normal) * 0.75f;
+		break;
+	}
+
+	particles[threadId] = self;
+}
 
 __device__ SParticle resolveParticle2ParticleCollision(SParticle& a, SParticle b)
 {
@@ -87,24 +197,71 @@ CSimulation::CSimulation(void* d_particles, size_t particlesCount, float particl
 	hostPlanes.push_back(SPlane(make_float3(0.0, -1.0, 0.0), -0.5));
 	hostPlanes.push_back(SPlane(make_float3(0.0, 0.0, 1.0), -0.5));
 	hostPlanes.push_back(SPlane(make_float3(0.0, 0.0, -1.0), -0.5));
+	m_devicePlanes = hostPlanes;
 
 	m_collisionDetector = std::make_unique<CCollisionDetector>(m_deviceParticles, m_particlesCount, m_particleRadius, hostPlanes);
+
+	m_deviceForces.resize(m_particlesCount, make_float3(0.0f));
+	m_deviceForcesMatrix.resize(m_particlesCount * m_particlesCount, make_float3(0.0f));
+	m_deviceSpringsMatrix.resize(m_particlesCount * m_particlesCount, false);
+
+	thrust::host_vector<size_t> hostSegments(m_particlesCount + 1);
+	for (size_t i = 0; i < m_particlesCount + 1; ++i)
+		hostSegments[i] = i * m_particlesCount;
+
+	m_deviceReductionSegments = hostSegments;
 }
+
+//float CSimulation::UpdateState(float dt)
+//{
+//	dim3 blockDim(64);
+//	dim3 gridDim((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
+//
+//	auto d_earliestCollistion = m_collisionDetector->FindEarliestCollision();
+//
+//	moveParticlesKernel << <gridDim, blockDim >> > (m_deviceParticles, m_particlesCount, dt, d_earliestCollistion);
+//	resolveCollisionsKernel << <gridDim, blockDim >> > (m_deviceParticles, m_particlesCount, dt, d_earliestCollistion, m_collisionDetector->GetPlanes());
+//
+//	/*SObjectsCollision col;
+//	auto status = cudaMemcpy(&col, d_earliestCollistion, sizeof(col), cudaMemcpyDeviceToHost);
+//	assert(status == cudaSuccess);
+//	dt = fminf(dt, col.predictedTime);*/
+//
+//	return dt;
+//}
 
 float CSimulation::UpdateState(float dt)
 {
-	dim3 blockDim(64);
-	dim3 gridDim((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
+	cudaError_t cudaStatus;
+	auto blocks = unsigned((m_particlesCount - 1) / 32 + 1);
 
-	auto d_earliestCollistion = m_collisionDetector->FindEarliestCollision();
+	dim3 blockDim(32, 32);
+	dim3 gridDim(blocks, blocks);
 
-	moveParticlesKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, dt, d_earliestCollistion);
-	resolveCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, dt, d_earliestCollistion, m_collisionDetector->GetPlanes());
+	rebuildSprings << <gridDim, blockDim >> > (m_deviceParticles, m_particlesCount, m_particleRadius, m_deviceSpringsMatrix.data().get());
 
-	/*SObjectsCollision col;
-	auto status = cudaMemcpy(&col, d_earliestCollistion, sizeof(col), cudaMemcpyDeviceToHost);
-	assert(status == cudaSuccess);
-	dt = fminf(dt, col.predictedTime);*/
+	computeForcesMatrix << <gridDim, blockDim >> > (m_deviceParticles, m_particlesCount, m_particleRadius, m_deviceSpringsMatrix.data().get(), m_deviceForcesMatrix.data().get());
+
+	size_t storageBytes = 0;
+	cudaStatus = cub::DeviceSegmentedReduce::Sum(
+		nullptr, storageBytes,
+		m_deviceForcesMatrix.data().get(), m_deviceForces.data().get(),
+		int(m_particlesCount), m_deviceReductionSegments.data().get(), m_deviceReductionSegments.data().get() + 1);
+	assert(cudaStatus == cudaSuccess);
+
+	if (m_segmentedReductionStorage.size() != storageBytes)
+		m_segmentedReductionStorage.resize(storageBytes);
+
+	cudaStatus = cub::DeviceSegmentedReduce::Sum(
+		m_segmentedReductionStorage.data().get(), storageBytes,
+		m_deviceForcesMatrix.data().get(), m_deviceForces.data().get(),
+		int(m_particlesCount), m_deviceReductionSegments.data().get(), m_deviceReductionSegments.data().get() + 1);
+	assert(cudaStatus == cudaSuccess);
+
+	blockDim = dim3(64);
+	gridDim = dim3((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
+
+	moveParticlesKernel2 << <gridDim, blockDim >> > (m_deviceParticles, m_deviceForces.data().get(), m_particlesCount, m_particleRadius, m_devicePlanes.data().get(), m_devicePlanes.size(), dt);
 
 	return dt;
 }

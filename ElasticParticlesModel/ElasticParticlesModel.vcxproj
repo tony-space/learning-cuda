@@ -52,10 +52,10 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)third-party\cub\cub-1.8.0;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)third-party\cub\cub-1.8.0;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

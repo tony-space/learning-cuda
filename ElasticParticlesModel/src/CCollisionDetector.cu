@@ -65,24 +65,24 @@ __global__ void reduceKernel(const SObjectsCollision* __restrict__ values, size_
 		output[blockIdx.x] = val;
 }
 
-__global__ void predictParticleParticleCollisionsKernel(
-	const SParticle* __restrict__ particles,
-	const size_t particlesCount,
-	const float particlesRadius,
-	SObjectsCollision* __restrict__ out)
+__global__ void predictParticleParticleCollisionsKernel(const SParticleSOA particles, SObjectsCollision* __restrict__ out)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particlesCount)
+	if (threadId >= particles.count)
 		return;
 
-	SParticle self = particles[threadId];
+	auto selfPos = particles.pos[threadId];
+	auto selfVel = particles.vel[threadId];
+	auto selfRad = particles.radius[threadId];
 
 	SObjectsCollision earliestCollision;
 
-	for (size_t i = threadId + 1; i < particlesCount; ++i)
+	for (size_t i = threadId + 1; i < particles.count; ++i)
 	{
 		//if (i == threadId) continue;
-		SParticle other = particles[i];
+		auto otherPos = particles.pos[i];
+		auto otherVel = particles.vel[i];
+		auto otherRad = particles.radius[i];
 
 		//Let's solve a quadratic equation to predict the exact collision time.
 		//The quadric equation can be get from the following vector equation:
@@ -93,13 +93,13 @@ __global__ void predictParticleParticleCollisionsKernel(
 		//      dt is the unknown variable
 		//Vector dot product satisfies a distributive law.
 
-		float3 deltaR = self.pos - other.pos;
-		float3 deltaV = self.vel - other.vel;
+		float3 deltaR = selfPos - otherPos;
+		float3 deltaV = selfVel - otherVel;
 
 		//Quadratic equation coefficients
 		float a = dot(deltaV, deltaV);
 		float b = 2.0f * dot(deltaR, deltaV);
-		float c = dot(deltaR, deltaR) - sqr(particlesRadius + particlesRadius);
+		float c = dot(deltaR, deltaR) - sqr(selfRad + otherRad);
 		float discriminant = sqr(b) - 4.0f * a * c;
 
 		//if particles don't move relatively each other (deltaV = 0)
@@ -138,19 +138,18 @@ __global__ void predictParticleParticleCollisionsKernel(
 }
 
 __global__ void predictParticlePlaneCollisionsKernel(
-	const SParticle* __restrict__ particles,
-	const size_t particlesCount,
-	const float particlesRadius,
+	const SParticleSOA particles,
 	const SPlane* __restrict__ planes,
 	const size_t planesCount,
 	SObjectsCollision* __restrict__ inOut)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particlesCount)
+	if (threadId >= particles.count)
 		return;
 
-	SParticle self = particles[threadId];
-
+	auto pos = particles.pos[threadId];
+	auto vel = particles.vel[threadId];
+	auto rad = particles.radius[threadId];
 
 	SObjectsCollision earliestCollision = inOut[threadId];
 
@@ -158,44 +157,41 @@ __global__ void predictParticlePlaneCollisionsKernel(
 	{
 		SPlane plane = planes[i];
 
-		auto velProjection = dot(plane.normal, self.vel);
+		auto velProjection = dot(plane.normal, vel);
 
 		if (velProjection >= 0.0f)
 			continue;
 
-		auto time = max(-plane.Distance(self, particlesRadius) / velProjection, 0.0f);
+		auto time = max(-plane.Distance(pos, rad) / velProjection, 0.0f);
 		earliestCollision.AnalyzeAndApply(threadId, i, time, SObjectsCollision::CollisionType::ParticleToPlane);
 	}
 
 	inOut[threadId] = earliestCollision;
 }
 
-CCollisionDetector::CCollisionDetector(const SParticle * d_particles, size_t particlesCount, float particleRadius, const thrust::host_vector<SPlane>& planes) :
+CCollisionDetector::CCollisionDetector(const SParticleSOA d_particles, const thrust::host_vector<SPlane>& worldBoundaries) :
 	m_deviceParticles(d_particles),
-	m_particlesCount(particlesCount),
-	m_devicePlanes(planes),
-	m_particleRadius(particleRadius)
+	m_devicePlanes(worldBoundaries)
 {
 
-	auto intermediateSize = divCeil(divCeil(particlesCount, size_t(2)), kMaxReductionBlockSize);
-	m_collisions.resize(particlesCount);
+	auto intermediateSize = divCeil(divCeil(d_particles.count, size_t(2)), kMaxReductionBlockSize);
+	m_collisions.resize(d_particles.count);
 	m_intermediate.resize(intermediateSize);
-	
 }
 
 SObjectsCollision* CCollisionDetector::FindEarliestCollision()
 {
 	dim3 blockDim(64);
-	dim3 gridDim(divCeil(unsigned(m_particlesCount), blockDim.x));
+	dim3 gridDim(divCeil(unsigned(m_deviceParticles.count), blockDim.x));
 
 	auto collisions = m_collisions.data().get();
 	auto buffer1 = collisions;
 	auto buffer2 = m_intermediate.data().get();
 
-	predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, collisions);
-	predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_particlesCount, m_particleRadius, m_devicePlanes.data().get(), m_devicePlanes.size(), collisions);
+	predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, collisions);
+	predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_devicePlanes.data().get(), m_devicePlanes.size(), collisions);
 
-	for (size_t particles = m_particlesCount; particles > 1;)
+	for (size_t particles = m_deviceParticles.count; particles > 1;)
 	{
 		size_t pairs = divCeil(particles, size_t(2));
 		size_t warps = divCeil(pairs, size_t(32));
@@ -206,13 +202,6 @@ SObjectsCollision* CCollisionDetector::FindEarliestCollision()
 		std::swap(buffer1, buffer2);
 		particles = gridSize.x;
 	}
-
-	//SObjectsCollision debug1;
-	//auto status = cudaMemcpy(&debug1, buffer1, sizeof(debug1), cudaMemcpyDeviceToHost);
-	//auto debug2 = thrust::reduce(m_collisions.begin(), m_collisions.end(), SObjectsCollision(), SObjectsCollision::Comparator());
-
-	//if (debug1.predictedTime != debug2.predictedTime)
-	//	printf("ERROR!!!!\r\n");
 
 	return buffer1;
 }

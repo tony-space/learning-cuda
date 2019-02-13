@@ -4,7 +4,6 @@
 #include <thrust/device_vector.h>
 #include "ISimulation.hpp"
 
-//static const size_t kMolecules = 16384;
 static const size_t kMolecules = 128;
 static const float kParticleRad = 0.002f;
 
@@ -32,17 +31,6 @@ int main(int argc, char** argv)
 	sim->UpdateState(1.0f);
 	sim->UpdateState(1.0f);
 	sim->UpdateState(1.0f);
-
-	//constexpr float kEndTime = 10.0f;
-	//for (float time = 0.0f; time <= kEndTime;)
-	//{
-	//	auto simulatedTime = sim->UpdateState(1.0f);
-	//	auto lastTime = int(std::round(time * 10.0f));
-	//	time += simulatedTime;
-	//	auto current = int(std::round(time * 10.0f));
-	//	if (current > lastTime)
-	//		printf("%.1f\n", time);
-	//}
 
 	return 0;
 }

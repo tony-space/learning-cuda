@@ -9,13 +9,11 @@
 class CCollisionDetector
 {
 public:
-	CCollisionDetector(const SParticle* d_particles, size_t particlesCount, float particleRadius, const thrust::host_vector<SPlane>& worldBoundaries);
+	CCollisionDetector(const SParticleSOA d_particles, const thrust::host_vector<SPlane>& worldBoundaries);
 	SObjectsCollision* FindEarliestCollision();
 	const SPlane* GetPlanes() const { return m_devicePlanes.data().get(); }
 private:
-	const SParticle* m_deviceParticles;
-	const size_t m_particlesCount;
-	const float m_particleRadius;
+	const SParticleSOA m_deviceParticles;
 
 	thrust::device_vector<SPlane> m_devicePlanes;
 

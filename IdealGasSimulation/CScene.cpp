@@ -12,49 +12,38 @@
 static const size_t kMolecules = 8192;
 static const float kParticleRad = 0.004f;
 
-struct SParticle
+CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl"), m_state()
 {
-	glm::vec3 pos;
-	glm::vec3 vel;
-};
+	GLenum glError;
+	cudaError_t error;
 
-CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl")
-{
-	std::vector<SParticle> particles(kMolecules);
-	std::vector<glm::vec3> colors(kMolecules);
+	std::vector<glm::vec3> pos(kMolecules);
+	std::vector<glm::vec3> vel(kMolecules);
+	std::vector<glm::vec3> color(kMolecules);
+	std::vector<float> rad(kMolecules, kParticleRad);
+	std::vector<float> mass(kMolecules, 1.0f);
 
-	for (auto& p : particles)
-	{
-		//p.pos = glm::linearRand(glm::vec3(-0.5f, -0.5f, -0.5f) + kParticleRad, glm::vec3(0.5f, 0.5f, 0.5f) - kParticleRad);
-		//p.vel = glm::sphericalRand(1.0f) * glm::linearRand(0.0f, 0.3f);
-
-		p.pos = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
-		p.pos *= 0.5f;
-
-		if (glm::linearRand(0.0f, 1.0f) > 0.5f)
-			p.pos.x += 0.25f;
-		else
-			p.pos.x -= 0.25f;
-
-		p.vel.x += p.pos.z * 0.5f;
-		p.vel.z += -p.pos.x * 0.5f;
-	}
-
-	/*for (auto& c : colors)
-		c = glm::linearRand(glm::vec3(0.5f, 0.5f, 0.5f), glm::vec3(1.0f, 1.0f, 1.0f));*/
 
 	for (size_t i = 0; i < kMolecules; ++i)
-		colors[i] = particles[i].pos + glm::vec3(0.6f);
-
-	std::vector<glm::vec3> bufferData;
-	bufferData.reserve(kMolecules * 3);
-	for (const auto& p : particles)
 	{
-		bufferData.push_back(p.pos);
-		bufferData.push_back(p.vel);
+		pos[i] = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
+		pos[i] *= 0.5f;
+
+		if (glm::linearRand(0.0f, 1.0f) > 0.5f)
+			pos[i].x += 0.25f;
+		else
+			pos[i].x -= 0.25f;
+
+		vel[i].x += pos[i].z * 0.5f;
+		vel[i].z -= pos[i].x * 0.5f;
+
+		color[i] = pos[i] + glm::vec3(0.6f);
 	}
 
-	bufferData.insert(bufferData.end(), colors.begin(), colors.end());
+	std::vector<glm::vec3> bufferData;
+	bufferData.reserve(kMolecules * 2);
+	bufferData.insert(bufferData.end(), pos.begin(), pos.end());
+	bufferData.insert(bufferData.end(), color.begin(), color.end());
 
 
 	glGenBuffers(1, &m_moleculesVBO);
@@ -62,10 +51,12 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	glBufferData(GL_ARRAY_BUFFER, bufferData.size() * sizeof(bufferData[0]), bufferData.data(), GL_STREAM_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-	auto err = glGetError();
-	assert(err == GL_NO_ERROR);
+	glError = glGetError();
+	assert(glError == GL_NO_ERROR);
 
-	cudaError_t error;
+	
+	//filling state
+	m_state.count = kMolecules;
 
 	error = cudaGraphicsGLRegisterBuffer(&m_resource, m_moleculesVBO, cudaGraphicsRegisterFlagsNone);
 	assert(error == cudaSuccess);
@@ -73,12 +64,31 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	error = cudaGraphicsMapResources(1, &m_resource);
 	assert(error == cudaSuccess);
 
-	void* d_stateVector;
 	size_t stateSize;
-	error = cudaGraphicsResourceGetMappedPointer(&d_stateVector, &stateSize, m_resource);
+	error = cudaGraphicsResourceGetMappedPointer((void**)&m_state.pos, &stateSize, m_resource);
 	assert(error == cudaSuccess);
 
-	m_cudaSim = ISimulation::CreateInstance(d_stateVector, kMolecules, kParticleRad);
+	error = cudaMalloc(&m_state.vel, kMolecules * sizeof(float3));
+	assert(error == cudaSuccess);
+	error = cudaMemcpy(m_state.vel, vel.data(), kMolecules * sizeof(float3), cudaMemcpyHostToDevice);
+	assert(error == cudaSuccess);
+
+	//no need to copy forces
+	error = cudaMalloc(&m_state.force, kMolecules * sizeof(float3));
+	assert(error == cudaSuccess);
+
+	error = cudaMalloc(&m_state.radius, kMolecules * sizeof(float));
+	assert(error == cudaSuccess);
+	error = cudaMemcpy(m_state.radius, rad.data(), kMolecules * sizeof(float), cudaMemcpyHostToDevice);
+	assert(error == cudaSuccess);
+
+	error = cudaMalloc(&m_state.mass, kMolecules * sizeof(float));
+	assert(error == cudaSuccess);
+	error = cudaMemcpy(m_state.mass, mass.data(), kMolecules * sizeof(float), cudaMemcpyHostToDevice);
+	assert(error == cudaSuccess);
+
+
+	m_cudaSim = ISimulation::CreateInstance(m_state);
 }
 
 CScene::~CScene()
@@ -120,8 +130,8 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
-	glVertexPointer(3, GL_FLOAT, sizeof(SParticle), (void*)0);
-	glColorPointer(3, GL_FLOAT, 0, (void*)(kMolecules * 2 * sizeof(glm::vec3)));
+	glVertexPointer(3, GL_FLOAT, 0, (void*)(0));
+	glColorPointer(3, GL_FLOAT, 0, (void*)(kMolecules * sizeof(glm::vec3)));
 	glDrawArrays(GL_POINTS, 0, kMolecules);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);

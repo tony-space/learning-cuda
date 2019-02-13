@@ -30,7 +30,7 @@ __global__ void rebuildSprings(const SParticle* __restrict__ particles, const si
 		}
 		else
 		{
-			result = magnitude <= diameter * 1.5f;
+			result = magnitude <= diameter * 1.25f;
 		}
 	}
 
@@ -61,7 +61,7 @@ __global__ void computeForcesMatrix(const SParticle* __restrict__ particles, con
 
 		if (!connected && magnitude > diameter)
 		{
-			constexpr float k = 3e-7f;
+			constexpr float k = 8e-7f;
 			result = -k * r / (magnitude * magnitude * magnitude);
 		}
 		else
@@ -92,7 +92,7 @@ __global__ void moveParticlesKernel2(
 	float3 force = forces[threadId];
 	//force.y -= 0.1f; // gravity
 
-	//force -= 0.1f * self.vel;
+	force -= 0.01f * self.vel;
 
 	self.pos += self.vel * dt;
 	self.vel += force * dt;

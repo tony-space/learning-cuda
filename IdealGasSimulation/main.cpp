@@ -63,7 +63,7 @@ void DisplayFunc()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	static const float mass = 1.0f;
-	static const float stiffness = 0.5f;
+	static const float stiffness = 0.05f;
 	static const float damp = 5.0f;
 	auto force = -glm::vec2(g_mouseDelta.y, g_mouseDelta.x) * stiffness - g_cameraVelocity.xy * damp;
 	auto accel = force / mass;

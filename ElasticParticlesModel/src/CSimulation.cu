@@ -30,6 +30,8 @@ __global__ void rebuildSprings(const SParticleSOA particles, bool* __restrict__ 
 		{
 			result = magnitude <= diameter * 1.25f;
 		}
+
+		//result = magnitude < diameter;
 	}
 
 	springsMat[matIndex] = result;
@@ -51,6 +53,8 @@ __global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __
 		bool connected = springsMat[matIndex];
 		auto pos1 = particles.pos[i];
 		auto pos2 = particles.pos[j];
+		auto mass1 = particles.mass[i];
+		auto mass2 = particles.mass[j];
 
 		auto r = pos1 - pos2;
 		auto magnitude = length(r);
@@ -59,12 +63,12 @@ __global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __
 		if (!connected && magnitude > diameter)
 		{
 			constexpr float k = 8e-7f;
-			result = -k * r / (magnitude * magnitude * magnitude);
+			result = -k * mass1 * mass2 * r / (magnitude * magnitude * magnitude);
 		}
 		else
 		{
-			constexpr float stiffness = 100.0f;
-			constexpr float damp = 1.0f;
+			constexpr float stiffness = 7000.0f;
+			constexpr float damp = 50.0f;
 
 			auto delta = magnitude - diameter;
 
@@ -104,85 +108,79 @@ __global__ void moveParticlesKernel2(SParticleSOA particles, const SPlane* __res
 		if (dot(p.normal, vel) >= 0.0f)
 			continue;
 
-		vel = reflect(vel, p.normal) * 0.75f;
+		vel = reflect(vel, p.normal);
 		break;
 	}
 
 	particles.pos[threadId] = pos;
 	particles.vel[threadId] = vel;
 }
-//
-//__device__ SParticle resolveParticle2ParticleCollision(SParticle& a, SParticle b)
-//{
-//	auto centerOfMassVel = (a.vel + b.vel) / 2.0f;
-//	auto v1 = a.vel - centerOfMassVel;
-//	auto v2 = b.vel - centerOfMassVel;
-//
-//	auto planeNormal = normalize(b.pos - a.pos);
-//
-//	v1 = reflect(v1, planeNormal) * 0.98f;
-//	v2 = reflect(v2, planeNormal) * 0.98f;
-//
-//	a.vel = v1 + centerOfMassVel;
-//	b.vel = v2 + centerOfMassVel;
-//
-//	return b;
-//}
-//
-//__device__ void resolveParticle2PlaneCollision(SPlane plane, SParticle& particle)
-//{
-//	particle.vel = reflect(particle.vel, plane.normal) * 0.98f;
-//}
-//
-//__global__ void moveParticlesKernel(SParticle* __restrict__ particles, const size_t particlesCount, float dt, const SObjectsCollision* __restrict__ earilestCollision)
-//{
-//	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-//	if (threadId >= particlesCount)
-//		return;
-//
-//	dt = fminf(earilestCollision->predictedTime, dt);
-//
-//	SParticle self = particles[threadId];
-//	self.pos += self.vel * dt;
-//	self.vel.y -= 1.0f * dt;
-//
-//	particles[threadId] = self;
-//}
-//
-//__global__ void resolveCollisionsKernel(
-//	SParticle* __restrict__ particles,
-//	const size_t particlesCount,
-//	const float dt,
-//	const SObjectsCollision* __restrict__ pEarilestCollision,
-//	const SPlane* __restrict__ pPlanes)
-//{
-//	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-//	if (threadId >= particlesCount)
-//		return;
-//
-//	auto collision = *pEarilestCollision;
-//
-//	if (dt < collision.predictedTime)
-//		return;
-//
-//	if (collision.object1 != threadId)
-//		return;
-//
-//	SParticle self = particles[threadId];
-//
-//	switch (collision.collisionType)
-//	{
-//	case SObjectsCollision::CollisionType::ParticleToPlane:
-//		resolveParticle2PlaneCollision(pPlanes[collision.object2], self);
-//		break;
-//
-//	case SObjectsCollision::CollisionType::ParticleToParticle:
-//		particles[collision.object2] = resolveParticle2ParticleCollision(self, particles[collision.object2]);
-//		break;
-//	}
-//
-//	particles[threadId] = self;
-//}
+
+__device__ void resolveParticle2ParticleCollision(const float3& pos1, float3& vel1, const float3& pos2, float3& vel2)
+{
+	auto centerOfMassVel = (vel1 + vel2) / 2.0f;
+	auto v1 = vel1 - centerOfMassVel;
+	auto v2 = vel2 - centerOfMassVel;
+
+	auto planeNormal = normalize(pos1 - pos2);
+
+	v1 = reflect(v1, planeNormal);
+	v2 = reflect(v2, planeNormal);
+
+	vel1 = v1 + centerOfMassVel;
+	vel2 = v2 + centerOfMassVel;
+}
+
+__global__ void moveParticlesKernel(SParticleSOA particles, float dt, const SObjectsCollision* __restrict__ earilestCollision)
+{
+	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= particles.count)
+		return;
+
+	dt = fminf(earilestCollision->predictedTime, dt);
+
+	auto pos = particles.pos[threadId];
+	auto vel = particles.vel[threadId];
+
+	pos += vel * dt;
+	particles.pos[threadId] = pos;
+
+	//vel.y -= 1.0f * dt;
+	//particles.vel[threadId] = vel;
+}
+
+__global__ void resolveCollisionsKernel(
+	SParticleSOA particles,
+	const float dt,
+	const SObjectsCollision* __restrict__ pEarilestCollision,
+	const SPlane* __restrict__ pPlanes)
+{
+	auto collision = *pEarilestCollision;
+
+	if (dt < collision.predictedTime)
+		return;
+
+	auto pos1 = particles.pos[collision.object1];
+	auto vel1 = particles.vel[collision.object1];
+
+	switch (collision.collisionType)
+	{
+	case SObjectsCollision::CollisionType::ParticleToPlane:
+		vel1 = reflect(vel1, pPlanes[collision.object2].normal);
+		break;
+
+	case SObjectsCollision::CollisionType::ParticleToParticle:
+		auto pos2 = particles.pos[collision.object2];
+		auto vel2 = particles.vel[collision.object2];
+
+		resolveParticle2ParticleCollision(pos1, vel1, pos2, vel2);
+		particles.vel[collision.object2] = vel2;
+
+		break;
+	}
+
+	particles.vel[collision.object1] = vel1;
+}
 
 CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particles)
 {
@@ -212,17 +210,12 @@ CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particl
 //float CSimulation::UpdateState(float dt)
 //{
 //	dim3 blockDim(64);
-//	dim3 gridDim((unsigned(m_particlesCount) - 1) / blockDim.x + 1);
+//	dim3 gridDim((unsigned(m_deviceParticles.count) - 1) / blockDim.x + 1);
 //
 //	auto d_earliestCollistion = m_collisionDetector->FindEarliestCollision();
 //
-//	moveParticlesKernel << <gridDim, blockDim >> > (m_deviceParticles, m_particlesCount, dt, d_earliestCollistion);
-//	resolveCollisionsKernel << <gridDim, blockDim >> > (m_deviceParticles, m_particlesCount, dt, d_earliestCollistion, m_collisionDetector->GetPlanes());
-//
-//	/*SObjectsCollision col;
-//	auto status = cudaMemcpy(&col, d_earliestCollistion, sizeof(col), cudaMemcpyDeviceToHost);
-//	assert(status == cudaSuccess);
-//	dt = fminf(dt, col.predictedTime);*/
+//	moveParticlesKernel << <gridDim, blockDim >> > (m_deviceParticles, dt, d_earliestCollistion);
+//	resolveCollisionsKernel <<<1, 1 >>> (m_deviceParticles, dt, d_earliestCollistion, m_collisionDetector->GetPlanes());
 //
 //	return dt;
 //}

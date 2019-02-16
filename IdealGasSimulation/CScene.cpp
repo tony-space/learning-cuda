@@ -20,8 +20,8 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	std::vector<glm::vec3> pos(kMolecules);
 	std::vector<glm::vec3> vel(kMolecules);
 	std::vector<glm::vec3> color(kMolecules);
-	std::vector<float> rad(kMolecules, kParticleRad);
-	std::vector<float> mass(kMolecules, 1.0f);
+	std::vector<float> rad(kMolecules);
+	std::vector<float> mass(kMolecules);
 
 
 	for (size_t i = 0; i < kMolecules; ++i)
@@ -38,12 +38,14 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 		vel[i].z -= pos[i].x * 0.5f;
 
 		color[i] = pos[i] + glm::vec3(0.6f);
+		rad[i] = kParticleRad;
+		mass[i] = 1.0f;
 	}
 
-	std::vector<glm::vec3> bufferData;
-	bufferData.reserve(kMolecules * 2);
-	bufferData.insert(bufferData.end(), pos.begin(), pos.end());
-	bufferData.insert(bufferData.end(), color.begin(), color.end());
+	std::vector<float> bufferData;
+	bufferData.insert(bufferData.end(), (float*)pos.data(), (float*)pos.data() + pos.size() * 3);
+	bufferData.insert(bufferData.end(), (float*)color.data(), (float*)color.data() + color.size() * 3);
+	bufferData.insert(bufferData.end(), rad.begin(), rad.end());
 
 
 	glGenBuffers(1, &m_moleculesVBO);
@@ -53,7 +55,6 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 
 	glError = glGetError();
 	assert(glError == GL_NO_ERROR);
-
 	
 	//filling state
 	m_state.count = kMolecules;
@@ -65,8 +66,13 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	assert(error == cudaSuccess);
 
 	size_t stateSize;
-	error = cudaGraphicsResourceGetMappedPointer((void**)&m_state.pos, &stateSize, m_resource);
+	void* pVboData = nullptr;
+	error = cudaGraphicsResourceGetMappedPointer(&pVboData, &stateSize, m_resource);
 	assert(error == cudaSuccess);
+	m_state.pos = (float3*)pVboData;
+	m_state.color = m_state.pos + kMolecules;
+	m_state.radius = (float*)(m_state.color + kMolecules);
+
 
 	error = cudaMalloc(&m_state.vel, kMolecules * sizeof(float3));
 	assert(error == cudaSuccess);
@@ -75,11 +81,6 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 
 	//no need to copy forces
 	error = cudaMalloc(&m_state.force, kMolecules * sizeof(float3));
-	assert(error == cudaSuccess);
-
-	error = cudaMalloc(&m_state.radius, kMolecules * sizeof(float));
-	assert(error == cudaSuccess);
-	error = cudaMemcpy(m_state.radius, rad.data(), kMolecules * sizeof(float), cudaMemcpyHostToDevice);
 	assert(error == cudaSuccess);
 
 	error = cudaMalloc(&m_state.mass, kMolecules * sizeof(float));
@@ -96,11 +97,22 @@ CScene::~CScene()
 	m_cudaSim.reset();
 
 	cudaError_t error;
+
+	error = cudaFree(m_state.mass);
+	assert(error == cudaSuccess);
+	
+	error = cudaFree(m_state.force);
+	assert(error == cudaSuccess);
+	
+	error = cudaFree(m_state.vel);
+	assert(error == cudaSuccess);
+
 	error = cudaGraphicsUnmapResources(1, &m_resource);
 	assert(error == cudaSuccess);
 
 	error = cudaGraphicsUnregisterResource(m_resource);
 	assert(error == cudaSuccess);
+
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDeleteBuffers(1, &m_moleculesVBO);
@@ -122,20 +134,27 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 	auto smartSwitcher = m_spriteShader.Activate();
 
 	static const glm::vec4 lightDirection = glm::normalize(glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
-	m_spriteShader.SetUniform("pointRadius", kParticleRad);
 	m_spriteShader.SetUniform("pointScale", windowHeight / tanf(fov / 2.0f *  float(M_PI) / 180.0f));
 	m_spriteShader.SetUniform("lightDir", (mvm * lightDirection).xyz);
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_moleculesVBO);
+	auto posLoc = m_spriteShader.GetAttributeLocation("pos");
+	auto colorLoc = m_spriteShader.GetAttributeLocation("color");
+	auto radLoc = m_spriteShader.GetAttributeLocation("radius");
 
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
-	glVertexPointer(3, GL_FLOAT, 0, (void*)(0));
-	glColorPointer(3, GL_FLOAT, 0, (void*)(kMolecules * sizeof(glm::vec3)));
+	glEnableVertexAttribArray(posLoc);
+	glEnableVertexAttribArray(colorLoc);
+	glEnableVertexAttribArray(radLoc);
+
+	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(colorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void*)(kMolecules * sizeof(glm::vec3)));
+	glVertexAttribPointer(radLoc, 1, GL_FLOAT, GL_FALSE, 0, (void*)(2 * kMolecules * sizeof(glm::vec3)));
+
 	glDrawArrays(GL_POINTS, 0, kMolecules);
-	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
 
+	glDisableVertexAttribArray(radLoc);
+	glDisableVertexAttribArray(colorLoc);
+	glDisableVertexAttribArray(posLoc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	auto err = glGetError();

@@ -179,6 +179,8 @@ void CShaderProgram::SetUniform(const std::string& name, float value)
 	}
 
 	glUniform1f(location, value);
+	status = glGetError();
+	if (status != GL_NO_ERROR) throw std::runtime_error("glUniform1f failed");
 }
 
 void CShaderProgram::SetUniform(const std::string & name, glm::vec3 value)
@@ -198,6 +200,24 @@ void CShaderProgram::SetUniform(const std::string & name, glm::vec3 value)
 	}
 
 	glUniform3f(location, value.x, value.y, value.z);
+	status = glGetError();
+	if (status != GL_NO_ERROR) throw std::runtime_error("glUniform3f failed");
+}
+
+GLint CShaderProgram::GetAttributeLocation(const std::string & name)
+{
+	auto it = m_attribLocationCache.find(name);
+	if (it != m_attribLocationCache.end())
+		return it->second;
+	else
+	{
+		auto location = glGetAttribLocation(m_program, name.c_str());
+		auto status = glGetError();
+		if(status != GL_NO_ERROR) throw std::runtime_error("GetAttributeLocation failed");
+
+		m_attribLocationCache[name] = location;
+		return location;
+	}
 }
 
 CShaderProgram::ProgramSwitcher::ProgramSwitcher(GLuint program)

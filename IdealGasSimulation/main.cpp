@@ -29,10 +29,10 @@ float g_deltaTime = 0.0f;
 void InitScene()
 {
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_POINT_SPRITE);
 
 	//See the link below to read more  about GL_POINT_SPRITE_ARB
 	//https://www.khronos.org/registry/OpenGL/extensions/ARB/ARB_point_sprite.txt
+	glEnable(GL_POINT_SPRITE);
 	glTexEnvi(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
@@ -148,11 +148,11 @@ int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
-	//glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH /*| GLUT_BORDERLESS | GLUT_CAPTIONLESS*/);
-	//glutInitWindowSize(1366, 768);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH /*| GLUT_BORDERLESS | GLUT_CAPTIONLESS*/);
+	glutInitWindowSize(1280, 768);
 	
-	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
-	glutInitWindowSize(1920, 1080);
+	//glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
+	//glutInitWindowSize(1920, 1080);
 
 	glutCreateWindow("Ideal gas simulation");
 

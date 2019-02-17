@@ -20,26 +20,49 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	std::vector<glm::vec3> pos(kMolecules);
 	std::vector<glm::vec3> vel(kMolecules);
 	std::vector<glm::vec3> color(kMolecules);
-	std::vector<float> rad(kMolecules);
-	std::vector<float> mass(kMolecules);
+	std::vector<float> rad(kMolecules, kParticleRad);
+	std::vector<float> mass(kMolecules, 1.0f);
 
+
+	//for (size_t i = 0; i < kMolecules; ++i)
+	//{
+	//	pos[i] = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
+	//	pos[i] *= 0.5f;
+
+	//	if (glm::linearRand(0.0f, 1.0f) > 0.5f)
+	//		pos[i].x += 0.25f;
+	//	else
+	//		pos[i].x -= 0.25f;
+
+	//	vel[i].x += pos[i].z * 0.5f;
+	//	vel[i].z -= pos[i].x * 0.5f;
+
+	//	color[i] = pos[i] + glm::vec3(0.6f);
+	//	rad[i] = kParticleRad;
+	//	mass[i] = 1.0f;
+	//}
 
 	for (size_t i = 0; i < kMolecules; ++i)
 	{
-		pos[i] = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
-		pos[i] *= 0.5f;
+		if (glm::linearRand(0.0f, 20.0f) < 19.0f)
+		{
+			pos[i] = glm::vec3
+			(
+				glm::linearRand(-0.01f, 0.01f),
+				glm::linearRand(-0.1f, 0.1f),
+				glm::linearRand(-0.1f, 0.1f)
+			);
 
-		if (glm::linearRand(0.0f, 1.0f) > 0.5f)
-			pos[i].x += 0.25f;
+			pos[i].x -= 0.075f;
+		}
 		else
-			pos[i].x -= 0.25f;
-
-		vel[i].x += pos[i].z * 0.5f;
-		vel[i].z -= pos[i].x * 0.5f;
+		{
+			pos[i] = glm::sphericalRand(0.01f);
+			pos[i].x += 0.35f;
+			vel[i].x = -5.0f;
+		}
 
 		color[i] = pos[i] + glm::vec3(0.6f);
-		rad[i] = kParticleRad;
-		mass[i] = 1.0f;
 	}
 
 	std::vector<float> bufferData;

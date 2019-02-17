@@ -4,6 +4,20 @@
 #include "CSimulation.hpp"
 #include <cub/device/device_segmented_reduce.cuh>
 
+__device__ float3 getHeatMapColor(float value)
+{
+	value = fminf(fmaxf(value, 0.0f), 1.0f);
+
+	static const size_t stages = 7;
+	static const float3 heatMap[stages] = { {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 1.0f} };
+	value *= stages - 1;
+	int idx1 = int(value);
+	int idx2 = idx1 + 1;
+	float fract1 = value - float(idx1);
+	return heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]);
+}
+
+
 __global__ void rebuildSprings(const SParticleSOA particles, bool* __restrict__ springsMat)
 {
 	auto i = blockIdx.y * blockDim.y + threadIdx.y;

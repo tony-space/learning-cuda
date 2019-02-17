@@ -9,8 +9,8 @@
 #include <cmath>
 
 
-static const size_t kMolecules = 8192;
-static const float kParticleRad = 0.004f;
+static const size_t kMolecules = 2048;
+static const float kParticleRad = 0.01f;
 
 CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl"), m_state()
 {
@@ -24,45 +24,24 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	std::vector<float> mass(kMolecules, 1.0f);
 
 
-	//for (size_t i = 0; i < kMolecules; ++i)
-	//{
-	//	pos[i] = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
-	//	pos[i] *= 0.5f;
-
-	//	if (glm::linearRand(0.0f, 1.0f) > 0.5f)
-	//		pos[i].x += 0.25f;
-	//	else
-	//		pos[i].x -= 0.25f;
-
-	//	vel[i].x += pos[i].z * 0.5f;
-	//	vel[i].z -= pos[i].x * 0.5f;
-
-	//	color[i] = pos[i] + glm::vec3(0.6f);
-	//	rad[i] = kParticleRad;
-	//	mass[i] = 1.0f;
-	//}
-
 	for (size_t i = 0; i < kMolecules; ++i)
 	{
-		if (glm::linearRand(0.0f, 20.0f) < 19.0f)
-		{
-			pos[i] = glm::vec3
-			(
-				glm::linearRand(-0.01f, 0.01f),
-				glm::linearRand(-0.1f, 0.1f),
-				glm::linearRand(-0.1f, 0.1f)
-			);
+		pos[i] = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
+		pos[i] *= 0.5f;
 
-			pos[i].x -= 0.075f;
-		}
+		if (glm::linearRand(0.0f, 1.0f) > 0.5f)
+			pos[i].x += 0.25f;
 		else
-		{
-			pos[i] = glm::sphericalRand(0.01f);
-			pos[i].x += 0.35f;
-			vel[i].x = -5.0f;
-		}
+			pos[i].x -= 0.25f;
+
+		vel[i] = glm::sphericalRand(0.05f);
+
+		vel[i].x += pos[i].z * 0.5f;
+		vel[i].z -= pos[i].x * 0.5f;
 
 		color[i] = pos[i] + glm::vec3(0.6f);
+		rad[i] = kParticleRad;
+		mass[i] = 1.0f;
 	}
 
 	std::vector<float> bufferData;
@@ -102,10 +81,6 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	error = cudaMemcpy(m_state.vel, vel.data(), kMolecules * sizeof(float3), cudaMemcpyHostToDevice);
 	assert(error == cudaSuccess);
 
-	//no need to copy forces
-	error = cudaMalloc(&m_state.force, kMolecules * sizeof(float3));
-	assert(error == cudaSuccess);
-
 	error = cudaMalloc(&m_state.mass, kMolecules * sizeof(float));
 	assert(error == cudaSuccess);
 	error = cudaMemcpy(m_state.mass, mass.data(), kMolecules * sizeof(float), cudaMemcpyHostToDevice);
@@ -122,9 +97,6 @@ CScene::~CScene()
 	cudaError_t error;
 
 	error = cudaFree(m_state.mass);
-	assert(error == cudaSuccess);
-	
-	error = cudaFree(m_state.force);
 	assert(error == cudaSuccess);
 	
 	error = cudaFree(m_state.vel);
@@ -149,7 +121,7 @@ void CScene::UpdateState(float dt)
 	//while (dt > 0 && counter++ < 32)
 	//	dt -= m_cudaSim->UpdateState(dt);
 
-	m_cudaSim->UpdateState(1.0f / 1000.0f);
+	m_cudaSim->UpdateState(dt);
 }
 
 void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)

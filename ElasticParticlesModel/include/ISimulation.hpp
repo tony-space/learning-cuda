@@ -11,7 +11,6 @@ struct SParticleSOA
 	//vector types
 	float3* __restrict__ pos;
 	float3* __restrict__ vel;
-	float3* __restrict__ force;
 	float3* __restrict__ color;
 	
 	//scalar types

@@ -28,19 +28,6 @@ struct SObjectsCollision
 
 	CollisionType collisionType = CollisionType::None;
 
-	static __device__ __host__ inline SObjectsCollision min(const SObjectsCollision& x, const SObjectsCollision& y)
-	{
-		return x.predictedTime < y.predictedTime ? x : y;
-	}
-
-	struct Comparator
-	{
-		__device__ __host__ inline SObjectsCollision operator()(const SObjectsCollision& x, const SObjectsCollision& y)
-		{
-			return SObjectsCollision::min(x,y);
-		}
-	};
-
 	__device__ inline void AnalyzeAndApply(const size_t obj1, const size_t obj2, float time, CollisionType type)
 	{
 		if (time < 0.0f) return;

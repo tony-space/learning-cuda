@@ -4,65 +4,9 @@
 #include "CSimulation.hpp"
 //#include <cuda_runtime.h>
 
-constexpr size_t kMaxReductionBlockSize = 256;
-constexpr SObjectsCollision kDefaultValue = SObjectsCollision();
-
 static inline __device__ __host__ float sqr(float x)
 {
 	return x * x;
-}
-
-static inline __device__ SObjectsCollision warpReduce(SObjectsCollision val)
-{
-	for (auto offset = warpSize >> 1; offset > 0; offset >>= 1)
-	{
-		auto neighbourTime = __shfl_down_sync(0xFFFFFFFF, val.predictedTime, offset);
-		auto neighbourIndex1 = __shfl_down_sync(0xFFFFFFFF, val.object1, offset);
-		auto neighbourIndex2 = __shfl_down_sync(0xFFFFFFFF, val.object2, offset);
-		auto neighbourType = (SObjectsCollision::CollisionType)__shfl_down_sync(0xFFFFFFFF, (int)val.collisionType, offset);
-
-		if (neighbourTime < val.predictedTime)
-		{
-			val.predictedTime = neighbourTime;
-			val.object1 = neighbourIndex1;
-			val.object2 = neighbourIndex2;
-			val.collisionType = neighbourType;
-		}
-	}
-	return val;
-}
-
-__global__ void reduceKernel(const SObjectsCollision* __restrict__ values, size_t size, SObjectsCollision* __restrict__ output)
-{
-	SObjectsCollision val;
-
-	auto threadId = blockDim.x * blockIdx.x + threadIdx.x;
-	auto warpId = threadIdx.x / unsigned(warpSize);
-	auto laneId = threadIdx.x % warpSize;
-	auto gridSize = blockDim.x * gridDim.x;
-
-	extern __shared__ SObjectsCollision cache[];
-	auto cacheSize = divCeil(blockDim.x, unsigned(warpSize)); //equals to amount of warps in blocks
-
-	if (threadId < size)
-		val = values[threadId];
-	if (threadId + gridSize < size)
-		val = SObjectsCollision::min(val,values[threadId + gridSize]);
-
-	val = warpReduce(val);
-	if (laneId == 0)
-		cache[warpId] = val;
-
-	if (warpId > 0)
-		return;
-
-	__syncthreads();
-
-	val = laneId < cacheSize ? cache[laneId] : kDefaultValue;
-	val = warpReduce(val);
-
-	if (laneId == 0)
-		output[blockIdx.x] = val;
 }
 
 __global__ void predictParticleParticleCollisionsKernel(const SParticleSOA particles, SObjectsCollision* __restrict__ out)
@@ -169,14 +113,39 @@ __global__ void predictParticlePlaneCollisionsKernel(
 	inOut[threadId] = earliestCollision;
 }
 
+__global__ void extractCollisionsTimeKernel(const SObjectsCollision* __restrict__ collisions, const size_t count, float* __restrict__ out)
+{
+	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId >= count)
+		return;
+
+	out[threadId] = collisions[threadId].predictedTime;
+}
+
+__global__ void copyResultKernel(
+	const SObjectsCollision* __restrict__ collisions,
+	const cub::KeyValuePair<int, float>* reductionResult,
+	SObjectsCollision* __restrict__ collisionResult)
+{
+	*collisionResult = collisions[reductionResult->key];
+}
+
 CCollisionDetector::CCollisionDetector(const SParticleSOA d_particles, const thrust::host_vector<SPlane>& worldBoundaries) :
 	m_deviceParticles(d_particles),
 	m_devicePlanes(worldBoundaries)
 {
-
-	auto intermediateSize = divCeil(divCeil(d_particles.count, size_t(2)), kMaxReductionBlockSize);
 	m_collisions.resize(d_particles.count);
-	m_intermediate.resize(intermediateSize);
+	m_mappedCollisionTimes.resize(d_particles.count);
+	m_reductionResult = thrust::device_malloc<cub::KeyValuePair<int, float>>(1);
+	m_collisionResult = thrust::device_malloc<SObjectsCollision>(1);
+
+	size_t tempStorageBytesSize = 0;
+	auto in = m_mappedCollisionTimes.data().get();
+	auto out = m_reductionResult.get();
+
+	auto status = cub::DeviceReduce::ArgMin(nullptr, tempStorageBytesSize, in, out, int(d_particles.count));
+	assert(status == cudaSuccess);
+	m_cubTemporaryStorage.resize(tempStorageBytesSize);
 }
 
 SObjectsCollision* CCollisionDetector::FindEarliestCollision()
@@ -185,23 +154,19 @@ SObjectsCollision* CCollisionDetector::FindEarliestCollision()
 	dim3 gridDim(divCeil(unsigned(m_deviceParticles.count), blockDim.x));
 
 	auto collisions = m_collisions.data().get();
-	auto buffer1 = collisions;
-	auto buffer2 = m_intermediate.data().get();
+	auto planes = m_devicePlanes.data().get();
+	auto timeArray = m_mappedCollisionTimes.data().get();
+	auto reductionResult = m_reductionResult.get();
+	auto result = m_collisionResult.get();
 
 	predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, collisions);
-	predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_devicePlanes.data().get(), m_devicePlanes.size(), collisions);
+	predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, planes, m_devicePlanes.size(), collisions);
+	extractCollisionsTimeKernel <<<gridDim, blockDim >>> (collisions, m_deviceParticles.count, timeArray);
 
-	for (size_t particles = m_deviceParticles.count; particles > 1;)
-	{
-		size_t pairs = divCeil(particles, size_t(2));
-		size_t warps = divCeil(pairs, size_t(32));
-		dim3 blockSize(unsigned(min(kMaxReductionBlockSize, warps * size_t(32))));
-		dim3 gridSize(unsigned(divCeil(pairs, size_t(blockSize.x))));
+	size_t tempStorageBytesSize = m_cubTemporaryStorage.size();
+	auto status = cub::DeviceReduce::ArgMin(m_cubTemporaryStorage.data().get(), tempStorageBytesSize, timeArray, reductionResult, int(m_deviceParticles.count));
+	assert(status == cudaSuccess);
+	copyResultKernel <<<1, 1 >>> (collisions, reductionResult, result);
 
-		reduceKernel <<<gridSize, blockSize, blockSize.x / 32 * sizeof(SObjectsCollision) >>> (buffer1, particles, buffer2);
-		std::swap(buffer1, buffer2);
-		particles = gridSize.x;
-	}
-
-	return buffer1;
+	return result;
 }

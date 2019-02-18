@@ -9,7 +9,7 @@
 #include <cmath>
 
 
-static const size_t kMolecules = 2048;
+static const size_t kMolecules = 1024;
 static const float kParticleRad = 0.01f;
 
 CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl"), m_state()

@@ -10,8 +10,6 @@
 class CSimulation : public ISimulation
 {
 public:
-	static constexpr float kSimPrecision = 1e-16f;
-
 	CSimulation(SParticleSOA d_particles);
 	virtual float UpdateState(float dt) override;
 

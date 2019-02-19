@@ -4,29 +4,71 @@
 #include "CSimulation.hpp"
 //#include <cuda_runtime.h>
 
-static inline __device__ __host__ float sqr(float x)
+template<typename T>
+static inline __device__ __host__ T sqr(T x)
 {
 	return x * x;
 }
 
-__global__ void predictParticleParticleCollisionsKernel(const SParticleSOA particles, SObjectsCollision* __restrict__ out)
+
+__global__ void copyResultKernel(
+	const cub::KeyValuePair<int, float>* particlesReductionResult,
+	const cub::KeyValuePair<int, float>* wallsReductionResult,
+	size_t particles,
+	size_t walls,
+	SObjectsCollision* __restrict__ collisionResult)
 {
-	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particles.count)
+	auto particlesResult = *particlesReductionResult;
+	auto wallsResult = *wallsReductionResult;
+
+	SObjectsCollision result;
+
+	if (particlesResult.value < wallsResult.value)
+	{
+		const size_t matIndex = size_t(particlesResult.key);
+		auto i = matIndex / particles;
+		auto j = matIndex % particles;
+
+		result.collisionType = SObjectsCollision::CollisionType::ParticleToParticle;
+		result.object1 = i;
+		result.object2 = j;
+		result.predictedTime = particlesResult.value;
+	}
+	else
+	{
+		const size_t matIndex = size_t(wallsResult.key);
+		auto wall = matIndex / particles;
+		auto particle = matIndex % particles;
+
+		result.collisionType = SObjectsCollision::CollisionType::ParticleToPlane;
+		result.object1 = particle;
+		result.object2 = wall;
+		result.predictedTime = wallsResult.value;
+	}
+
+	*collisionResult = result;
+}
+
+__global__ void predictParticleParticleCollisionsKernel(const SParticleSOA particles, float* __restrict__ matrix)
+{
+	auto i = blockIdx.y * blockDim.y + threadIdx.y;
+	auto j = blockIdx.x * blockDim.x + threadIdx.x;
+	auto threadId = i * particles.count + j;
+
+	if (i >= particles.count || j >= particles.count)
 		return;
 
-	auto selfPos = particles.pos[threadId];
-	auto selfVel = particles.vel[threadId];
-	auto selfRad = particles.radius[threadId];
+	float result = INFINITY;
 
-	SObjectsCollision earliestCollision;
-
-	for (size_t i = threadId + 1; i < particles.count; ++i)
+	if (i > j)
 	{
-		//if (i == threadId) continue;
-		auto otherPos = particles.pos[i];
-		auto otherVel = particles.vel[i];
-		auto otherRad = particles.radius[i];
+		auto selfPos = particles.pos[i];
+		auto selfVel = particles.vel[i];
+		auto selfRad = particles.radius[i];
+
+		auto otherPos = particles.pos[j];
+		auto otherVel = particles.vel[j];
+		auto otherRad = particles.radius[j];
 
 		//Let's solve a quadratic equation to predict the exact collision time.
 		//The quadric equation can be get from the following vector equation:
@@ -47,25 +89,29 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticleSOA parti
 		float discriminant = sqr(b) - 4.0f * a * c;
 
 		//if particles don't move relatively each other (deltaV = 0)
-		if (fabsf(a) <= CSimulation::kSimPrecision)
-			continue;
-
-		//if particles are flying away, don't check collision
+		if (fabsf(a) <= 0.0f)
+		{
+			matrix[threadId] = INFINITY;
+			return;
+		}
+		//if particles are flying away
 		if (b > 0.0f)
-			continue;
-
-		//if particles somehow have already penetrated each other (e.g. due to incorrect position generation), don't check collision.
-		//It's just a check for invalid states
+		{
+			matrix[threadId] = INFINITY;
+			return;
+		}
+		//if particles somehow have already penetrated one each other (e.g. due to incorrect position generation or numerical errors)
 		if (c < 0.0f)
 		{
-			earliestCollision.AnalyzeAndApply(threadId, i, 0.0f, SObjectsCollision::CollisionType::ParticleToParticle);
-			break;
-			//continue;
+			matrix[threadId] = 0.0f;
+			return;
 		}
-
 		//if particles ways never intersect
 		if (discriminant < 0.0f)
-			continue;
+		{
+			matrix[threadId] = INFINITY;
+			return;
+		}
 
 		float sqrtD = sqrtf(discriminant);
 		//Here is a tricky part.
@@ -74,99 +120,105 @@ __global__ void predictParticleParticleCollisionsKernel(const SParticleSOA parti
 		float dt1 = (-b - sqrtD) / (2.0f * a);
 		float dt2 = (-b + sqrtD) / (2.0f * a);
 
-		earliestCollision.AnalyzeAndApply(threadId, i, dt1, SObjectsCollision::CollisionType::ParticleToParticle);
-		earliestCollision.AnalyzeAndApply(threadId, i, dt2, SObjectsCollision::CollisionType::ParticleToParticle);
+		if (dt2 >= 0.0f)
+			result = dt2;
+		if (dt1 >= 0.0f)
+			result = dt1;
 	}
-
-	out[threadId] = earliestCollision;
+	matrix[threadId] = result;
 }
 
 __global__ void predictParticlePlaneCollisionsKernel(
 	const SParticleSOA particles,
 	const SPlane* __restrict__ planes,
 	const size_t planesCount,
-	SObjectsCollision* __restrict__ inOut)
+	float* __restrict__ matrix)
 {
-	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particles.count)
+	auto planeId = blockIdx.y * blockDim.y + threadIdx.y;
+	auto particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	auto threadId = planeId * particles.count + particleId;
+
+	if (planeId >= planesCount || particleId >= particles.count)
 		return;
 
-	auto pos = particles.pos[threadId];
-	auto vel = particles.vel[threadId];
-	auto rad = particles.radius[threadId];
+	auto pos = particles.pos[particleId];
+	auto vel = particles.vel[particleId];
+	auto rad = particles.radius[particleId];
+	auto plane = planes[planeId];
+	float result = INFINITY;
 
-	SObjectsCollision earliestCollision = inOut[threadId];
+	auto velProjection = dot(plane.normal, vel);
+	if (velProjection < 0.0f)
+		result = plane.Distance(pos, rad) / -velProjection;
 
-	for (size_t i = 0; i < planesCount; ++i)
-	{
-		SPlane plane = planes[i];
-
-		auto velProjection = dot(plane.normal, vel);
-
-		if (velProjection >= 0.0f)
-			continue;
-
-		auto time = max(-plane.Distance(pos, rad) / velProjection, 0.0f);
-		earliestCollision.AnalyzeAndApply(threadId, i, time, SObjectsCollision::CollisionType::ParticleToPlane);
-	}
-
-	inOut[threadId] = earliestCollision;
+	matrix[threadId] = result;
 }
 
-__global__ void extractCollisionsTimeKernel(const SObjectsCollision* __restrict__ collisions, const size_t count, float* __restrict__ out)
+CCollisionDetector::ArgMinReduction::ArgMinReduction(size_t rows, size_t columns)
 {
-	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= count)
-		return;
-
-	out[threadId] = collisions[threadId].predictedTime;
-}
-
-__global__ void copyResultKernel(
-	const SObjectsCollision* __restrict__ collisions,
-	const cub::KeyValuePair<int, float>* reductionResult,
-	SObjectsCollision* __restrict__ collisionResult)
-{
-	*collisionResult = collisions[reductionResult->key];
-}
-
-CCollisionDetector::CCollisionDetector(const SParticleSOA d_particles, const thrust::host_vector<SPlane>& worldBoundaries) :
-	m_deviceParticles(d_particles),
-	m_devicePlanes(worldBoundaries)
-{
-	m_collisions.resize(d_particles.count);
-	m_mappedCollisionTimes.resize(d_particles.count);
 	m_reductionResult = thrust::device_malloc<cub::KeyValuePair<int, float>>(1);
-	m_collisionResult = thrust::device_malloc<SObjectsCollision>(1);
+
+	m_matrix.resize(rows * columns);
 
 	size_t tempStorageBytesSize = 0;
-	auto in = m_mappedCollisionTimes.data().get();
-	auto out = m_reductionResult.get();
-
-	auto status = cub::DeviceReduce::ArgMin(nullptr, tempStorageBytesSize, in, out, int(d_particles.count));
+	auto status = cub::DeviceReduce::ArgMin(nullptr, tempStorageBytesSize, m_matrix.data().get(), m_reductionResult.get(), int(m_matrix.size()));
 	assert(status == cudaSuccess);
 	m_cubTemporaryStorage.resize(tempStorageBytesSize);
 }
 
-SObjectsCollision* CCollisionDetector::FindEarliestCollision()
+void CCollisionDetector::ArgMinReduction::Reduce()
 {
-	dim3 blockDim(64);
-	dim3 gridDim(divCeil(unsigned(m_deviceParticles.count), blockDim.x));
-
-	auto collisions = m_collisions.data().get();
-	auto planes = m_devicePlanes.data().get();
-	auto timeArray = m_mappedCollisionTimes.data().get();
-	auto reductionResult = m_reductionResult.get();
-	auto result = m_collisionResult.get();
-
-	predictParticleParticleCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, collisions);
-	predictParticlePlaneCollisionsKernel <<<gridDim, blockDim >>> (m_deviceParticles, planes, m_devicePlanes.size(), collisions);
-	extractCollisionsTimeKernel <<<gridDim, blockDim >>> (collisions, m_deviceParticles.count, timeArray);
+	//thrust::host_vector<float> debugVec = m_matrix;
+	//for (auto f : debugVec)
+	//	printf("%.2f ", f);
+	//printf("\n");
 
 	size_t tempStorageBytesSize = m_cubTemporaryStorage.size();
-	auto status = cub::DeviceReduce::ArgMin(m_cubTemporaryStorage.data().get(), tempStorageBytesSize, timeArray, reductionResult, int(m_deviceParticles.count));
+	auto status = cub::DeviceReduce::ArgMin(m_cubTemporaryStorage.data().get(), tempStorageBytesSize, m_matrix.data().get(), m_reductionResult.get(), int(m_matrix.size()));
 	assert(status == cudaSuccess);
-	copyResultKernel <<<1, 1 >>> (collisions, reductionResult, result);
 
-	return result;
+	//cub::KeyValuePair<int, float> debug;
+	//status = cudaMemcpy(&debug, m_reductionResult.get(), sizeof(debug), cudaMemcpyDeviceToHost);
+	//assert(status == cudaSuccess);
+	//printf("%d %f\n", debug.key, debug.value);
+	//printf("\n");
+}
+
+CCollisionDetector::CCollisionDetector(const SParticleSOA d_particles, const thrust::host_vector<SPlane>& worldBoundaries) :
+	m_deviceParticles(d_particles),
+	m_devicePlanes(worldBoundaries),
+	m_particle2particleReduction(d_particles.count, d_particles.count),
+	m_particle2planeReduction(worldBoundaries.size(), d_particles.count)
+{
+	m_collisionResult = thrust::device_malloc<SObjectsCollision>(1);
+}
+
+SObjectsCollision* CCollisionDetector::FindEarliestCollision()
+{
+	auto particles = unsigned(m_deviceParticles.count);
+	auto walls = unsigned(m_devicePlanes.size());
+
+	dim3 blockDim;
+	dim3 gridDim;
+
+	blockDim = dim3(32u, 32u);
+	gridDim = dim3(divCeil(particles, blockDim.x), divCeil(particles, blockDim.y));
+	predictParticleParticleCollisionsKernel << <gridDim, blockDim >> > (m_deviceParticles, m_particle2particleReduction.m_matrix.data().get());
+
+	blockDim = dim3(1024u, 1u);
+	gridDim = dim3(divCeil(particles, blockDim.x), divCeil(walls, blockDim.y));
+	predictParticlePlaneCollisionsKernel << <gridDim, blockDim >> > (m_deviceParticles, m_devicePlanes.data().get(), walls, m_particle2planeReduction.m_matrix.data().get());
+
+	m_particle2particleReduction.Reduce();
+	m_particle2planeReduction.Reduce();
+
+	copyResultKernel << <1, 1 >> > (m_particle2particleReduction.m_reductionResult.get(), m_particle2planeReduction.m_reductionResult.get(), particles, walls, m_collisionResult.get());
+
+	//SObjectsCollision debug;
+	//auto status = cudaMemcpy(&debug, m_collisionResult.get(), sizeof(debug), cudaMemcpyDeviceToHost);
+	//assert(status == cudaSuccess);
+	//printf("%f\n", debug.predictedTime);
+	//printf("\n");
+
+	return m_collisionResult.get();
 }

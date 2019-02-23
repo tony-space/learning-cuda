@@ -4,6 +4,8 @@
 #include "CSimulation.hpp"
 //#include <cuda_runtime.h>
 
+constexpr size_t kTileSize = 256;
+
 template<typename T>
 static inline __device__ __host__ T sqr(T x)
 {
@@ -49,83 +51,110 @@ __global__ void copyResultKernel(
 	*collisionResult = result;
 }
 
-__global__ void predictParticleParticleCollisionsKernel(const SParticleSOA particles, float* __restrict__ matrix)
+__device__ float predictCollision(float3 selfPos, float3 selfVel, float selfRad, float3 otherPos, float3 otherVel, float otherRad)
 {
-	auto i = blockIdx.y * blockDim.y + threadIdx.y;
-	auto j = blockIdx.x * blockDim.x + threadIdx.x;
-	auto threadId = i * particles.count + j;
+	//Let's solve a quadratic equation to predict the exact collision time.
+	//The quadric equation can be get from the following vector equation:
+	//(R1 + V1 * dt) - (R2 + V2 * dt) = rad1 + rad2  : the distance between new positions equals the sum of two radii
+	//where R1 and R2 are radius vectors of the current particles position
+	//      V1 and V2 are velocity vectors
+	//      rad1 and rad2 are particles' radii
+	//      dt is the unknown variable
+	//Vector dot product satisfies a distributive law.
 
-	if (i >= particles.count || j >= particles.count)
-		return;
+	float3 deltaR = selfPos - otherPos;
+	float3 deltaV = selfVel - otherVel;
+
+	//Quadratic equation coefficients
+	float a = dot(deltaV, deltaV);
+	float b = 2.0f * dot(deltaR, deltaV);
+	float c = dot(deltaR, deltaR) - sqr(selfRad + otherRad);
+	float discriminant = sqr(b) - 4.0f * a * c;
+
+	//if particles don't move relatively each other (deltaV = 0)
+	if (fabsf(a) <= 1e-6f)
+		return INFINITY;
+
+	//if particles are flying away
+	if (b > 0.0f)
+		return INFINITY;
+
+	//if particles somehow have already penetrated one each other (e.g. due to incorrect position generation or numerical errors)
+	if (c < 0.0f)
+		return 0.0f;
+
+	//if particles ways never intersect
+	if (discriminant < 0.0f)
+		return INFINITY;
+
+	float sqrtD = sqrtf(discriminant);
+	//Here is a tricky part.
+	//You might think, why we even need to compute dt2 if it definitely is greater than dt1?
+	//The answer is these two values can be negative, which means two contacts has already been somewhere in the past.
+	float dt1 = (-b - sqrtD) / (2.0f * a);
+	float dt2 = (-b + sqrtD) / (2.0f * a);
 
 	float result = INFINITY;
 
-	if (i > j)
+	if (dt2 >= 0.0f)
+		result = dt2;
+	if (dt1 >= 0.0f)
+		result = dt1;
+
+	return result;
+}
+
+__global__ void predictParticleParticleCollisionsKernel(const SParticleSOA particles, float* __restrict__ matrix)
+{
+	__shared__ float3 cachedPos[kTileSize * 2];
+	__shared__ float3 cachedVel[kTileSize * 2];
+	__shared__ float cachedRadius[kTileSize * 2];
+
+	const auto threadId = threadIdx.x;
+	const auto horizontalIdx = blockIdx.x * kTileSize + threadId;
+	const auto tileVerticalIdx = blockIdx.y * kTileSize;
+	const auto verticalIdx = tileVerticalIdx + threadId;
+
+	if (blockIdx.y > blockIdx.x)
 	{
-		auto selfPos = particles.pos[i];
-		auto selfVel = particles.vel[i];
-		auto selfRad = particles.radius[i];
-
-		auto otherPos = particles.pos[j];
-		auto otherVel = particles.vel[j];
-		auto otherRad = particles.radius[j];
-
-		//Let's solve a quadratic equation to predict the exact collision time.
-		//The quadric equation can be get from the following vector equation:
-		//(R1 + V1 * dt) - (R2 + V2 * dt) = rad1 + rad2  : the distance between new positions equals the sum of two radii
-		//where R1 and R2 are radius vectors of the current particles position
-		//      V1 and V2 are velocity vectors
-		//      rad1 and rad2 are particles' radii
-		//      dt is the unknown variable
-		//Vector dot product satisfies a distributive law.
-
-		float3 deltaR = selfPos - otherPos;
-		float3 deltaV = selfVel - otherVel;
-
-		//Quadratic equation coefficients
-		float a = dot(deltaV, deltaV);
-		float b = 2.0f * dot(deltaR, deltaV);
-		float c = dot(deltaR, deltaR) - sqr(selfRad + otherRad);
-		float discriminant = sqr(b) - 4.0f * a * c;
-
-		//if particles don't move relatively each other (deltaV = 0)
-		if (fabsf(a) <= 0.0f)
+		for (auto i = 0; i < kTileSize; ++i)
 		{
-			matrix[threadId] = INFINITY;
-			return;
+			if (i + tileVerticalIdx >= particles.count)
+				break;
+			matrix[particles.count * (tileVerticalIdx + i) + horizontalIdx] = INFINITY;
 		}
-		//if particles are flying away
-		if (b > 0.0f)
-		{
-			matrix[threadId] = INFINITY;
-			return;
-		}
-		//if particles somehow have already penetrated one each other (e.g. due to incorrect position generation or numerical errors)
-		if (c < 0.0f)
-		{
-			matrix[threadId] = 0.0f;
-			return;
-		}
-		//if particles ways never intersect
-		if (discriminant < 0.0f)
-		{
-			matrix[threadId] = INFINITY;
-			return;
-		}
-
-		float sqrtD = sqrtf(discriminant);
-		//Here is a tricky part.
-		//You might think, why we even need to compute dt2 if it definitely is greater than dt1?
-		//The answer is these two values can be negative, which means two contacts has already been somewhere in the past.
-		float dt1 = (-b - sqrtD) / (2.0f * a);
-		float dt2 = (-b + sqrtD) / (2.0f * a);
-
-		if (dt2 >= 0.0f)
-			result = dt2;
-		if (dt1 >= 0.0f)
-			result = dt1;
+		return;
 	}
-	matrix[threadId] = result;
+
+	if (horizontalIdx < particles.count)
+	{
+		cachedPos[threadId] = particles.pos[horizontalIdx];
+		cachedVel[threadId] = particles.vel[horizontalIdx];
+		cachedRadius[threadId] = particles.radius[horizontalIdx];
+	}
+
+	if (verticalIdx < particles.count)
+	{
+		cachedPos[threadId + kTileSize] = particles.pos[verticalIdx];
+		cachedVel[threadId + kTileSize] = particles.vel[verticalIdx];
+		cachedRadius[threadId + kTileSize] = particles.radius[verticalIdx];
+	}
+
+	//it's pointless to synchronize threads if there are more than 1 warp (each warp is 32 threads). Threads is a single warp are already synchronized.
+	if (kTileSize > 32)
+		__syncthreads();
+
+	if (horizontalIdx > particles.count)
+		return;
+
+	for (auto i = 0; i < kTileSize; ++i)
+	{
+		if (i + tileVerticalIdx >= particles.count)
+			return;
+
+		auto time = predictCollision(cachedPos[threadId], cachedVel[threadId], cachedRadius[threadId], cachedPos[i + kTileSize], cachedVel[i + kTileSize], cachedRadius[i + kTileSize]);
+		matrix[particles.count * (tileVerticalIdx + i) + horizontalIdx] = time;
+	}
 }
 
 __global__ void predictParticlePlaneCollisionsKernel(
@@ -149,7 +178,13 @@ __global__ void predictParticlePlaneCollisionsKernel(
 
 	auto velProjection = dot(plane.normal, vel);
 	if (velProjection < 0.0f)
-		result = plane.Distance(pos, rad) / -velProjection;
+	{
+		auto distance = plane.Distance(pos, rad);
+		if (distance < 0.0f)
+			result = 0.0f;
+		else
+			result = distance / -velProjection;
+	}
 
 	matrix[threadId] = result;
 }
@@ -168,21 +203,25 @@ CCollisionDetector::ArgMinReduction::ArgMinReduction(size_t rows, size_t columns
 
 void CCollisionDetector::ArgMinReduction::Reduce()
 {
-	//thrust::host_vector<float> debugVec = m_matrix;
-	//for (auto f : debugVec)
-	//	printf("%.2f ", f);
-	//printf("\n");
-
 	size_t tempStorageBytesSize = m_cubTemporaryStorage.size();
 	auto status = cub::DeviceReduce::ArgMin(m_cubTemporaryStorage.data().get(), tempStorageBytesSize, m_matrix.data().get(), m_reductionResult.get(), int(m_matrix.size()));
 	assert(status == cudaSuccess);
-
-	//cub::KeyValuePair<int, float> debug;
-	//status = cudaMemcpy(&debug, m_reductionResult.get(), sizeof(debug), cudaMemcpyDeviceToHost);
-	//assert(status == cudaSuccess);
-	//printf("%d %f\n", debug.key, debug.value);
-	//printf("\n");
 }
+
+//__global__ void resetMatrixKernel(float* __restrict__ matrix, size_t elementsCount)
+//{
+//	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
+//	if (threadId < elementsCount)
+//		matrix[threadId] = INFINITY;
+//}
+//void CCollisionDetector::ArgMinReduction::ResetMatrix()
+//{
+//	unsigned size = unsigned(m_matrix.size());
+//	dim3 blockDim(1024);
+//	dim3 gridDim(divCeil(size, blockDim.x));
+//
+//	resetMatrixKernel << <gridDim, blockDim >> > (m_matrix.data().get(), m_matrix.size());
+//}
 
 CCollisionDetector::CCollisionDetector(const SParticleSOA d_particles, const thrust::host_vector<SPlane>& worldBoundaries) :
 	m_deviceParticles(d_particles),
@@ -198,11 +237,13 @@ SObjectsCollision* CCollisionDetector::FindEarliestCollision()
 	auto particles = unsigned(m_deviceParticles.count);
 	auto walls = unsigned(m_devicePlanes.size());
 
+	//m_particle2particleReduction.ResetMatrix();
+
 	dim3 blockDim;
 	dim3 gridDim;
 
-	blockDim = dim3(32u, 32u);
-	gridDim = dim3(divCeil(particles, blockDim.x), divCeil(particles, blockDim.y));
+	blockDim = dim3(unsigned(kTileSize));
+	gridDim = dim3(divCeil(particles, blockDim.x), divCeil(particles, blockDim.x));
 	predictParticleParticleCollisionsKernel << <gridDim, blockDim >> > (m_deviceParticles, m_particle2particleReduction.m_matrix.data().get());
 
 	blockDim = dim3(1024u, 1u);
@@ -217,8 +258,8 @@ SObjectsCollision* CCollisionDetector::FindEarliestCollision()
 	//SObjectsCollision debug;
 	//auto status = cudaMemcpy(&debug, m_collisionResult.get(), sizeof(debug), cudaMemcpyDeviceToHost);
 	//assert(status == cudaSuccess);
-	//printf("%f\n", debug.predictedTime);
-	//printf("\n");
+	//if (debug.predictedTime < 0.0f)
+	//	printf("%.3f %d\n", debug.predictedTime, debug.collisionType);
 
 	return m_collisionResult.get();
 }

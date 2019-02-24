@@ -1,14 +1,25 @@
 #pragma once
 #include "../include/ISimulation.hpp"
 
-struct SPlane
+struct SPlane : float4
 {
-	float3 normal;
-	float planeDistance;
-	SPlane(float3 _normal, float _dist) : normal(normalize(_normal)), planeDistance(_dist) {	}
+	SPlane(float3 _normal, float _dist) : float4(make_float4(normalize(_normal), _dist))
+	{
+	}
+
+	inline __device__ __host__ float3 normal() const
+	{
+		return make_float3(*this);
+	}
+
+	inline __device__ __host__ float planeDistance() const
+	{
+		return w;
+	}
+
 	inline __device__ __host__ float Distance(const float3& pos, float radius)
 	{
-		return dot(pos, normal) - planeDistance - radius;
+		return dot(pos, normal()) - planeDistance() - radius;
 	}
 };
 
@@ -31,7 +42,7 @@ struct SObjectsCollision
 	__device__ inline void AnalyzeAndApply(const size_t obj1, const size_t obj2, float time, CollisionType type)
 	{
 		if (time < 0.0f) return;
-		if (time > predictedTime) return;
+		if (time >= predictedTime) return;
 
 		object1 = obj1;
 		object2 = obj2;

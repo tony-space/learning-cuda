@@ -14,24 +14,22 @@ public:
 	SObjectsCollision* FindEarliestCollision();
 	const SPlane* GetPlanes() const { return m_devicePlanes.data().get(); }
 private:
-	//cudaStream_t stream
-
 	const SParticleSOA m_deviceParticles;
 	thrust::device_vector<SPlane> m_devicePlanes;
 
 	struct ArgMinReduction
 	{
-		thrust::device_vector<float> m_matrix;
-		thrust::device_vector<uint8_t> m_cubTemporaryStorage;
-		thrust::device_ptr<cub::KeyValuePair<int, float>> m_reductionResult;
+		thrust::device_vector<SObjectsCollision> m_collisionResult;
 
-		ArgMinReduction(size_t rows, size_t columns);
+		thrust::device_vector<float> m_timeValues;
+		thrust::device_vector<uint8_t> m_cubTemporaryStorage;
+		thrust::device_ptr<cub::KeyValuePair<int, float>> m_timeReductionResult;
+
+		ArgMinReduction(size_t elementsCount);
 
 		void Reduce();
 	};
 
-	ArgMinReduction m_particle2particleReduction;
-	ArgMinReduction m_particle2planeReduction;
-
 	thrust::device_ptr<SObjectsCollision> m_collisionResult;
+	ArgMinReduction m_reduction;
 };

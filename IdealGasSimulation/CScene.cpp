@@ -12,21 +12,21 @@
 static const size_t kMolecules = 16384;
 static const float kParticleRad = 0.001f;
 
+//static const size_t kMolecules = 32;
+//static const float kParticleRad = 0.03f;
+
 CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.glsl"), m_state()
 {
 	GLenum glError;
 	cudaError_t error;
 
-	std::vector<glm::vec3> pos(kMolecules);
-	std::vector<glm::vec3> vel(kMolecules);
-	std::vector<glm::vec3> color(kMolecules);
-	std::vector<float> rad(kMolecules, kParticleRad);
-	std::vector<float> mass(kMolecules, 1.0f);
-
+	std::vector<glm::vec4> pos(kMolecules);
+	std::vector<glm::vec4> vel(kMolecules);
+	std::vector<glm::vec4> color(kMolecules);
 
 	for (size_t i = 0; i < kMolecules; ++i)
 	{
-		pos[i] = glm::sphericalRand(0.5f) * glm::linearRand(0.5f, 1.0f);
+		pos[i] = glm::vec4(glm::sphericalRand(0.4f) * glm::linearRand(0.25f, 1.0f), 1.0f);
 		pos[i] *= 0.5f;
 
 		if (glm::linearRand(0.0f, 1.0f) > 0.5f)
@@ -34,20 +34,17 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 		else
 			pos[i].x -= 0.25f;
 
-		vel[i] = glm::sphericalRand(0.05f);
+		vel[i].xyz = glm::sphericalRand(0.05f);
 
 		vel[i].x += pos[i].z * 0.5f;
 		vel[i].z -= pos[i].x * 0.5f;
 
-		color[i] = pos[i] + glm::vec3(0.6f);
-		rad[i] = kParticleRad;
-		mass[i] = 1.0f;
+		color[i] = pos[i] + glm::vec4(0.6f, 0.6f, 0.6f, 0.0f);
 	}
 
 	std::vector<float> bufferData;
-	bufferData.insert(bufferData.end(), (float*)pos.data(), (float*)pos.data() + pos.size() * 3);
-	bufferData.insert(bufferData.end(), (float*)color.data(), (float*)color.data() + color.size() * 3);
-	bufferData.insert(bufferData.end(), rad.begin(), rad.end());
+	bufferData.insert(bufferData.end(), (float*)pos.data(), (float*)pos.data() + pos.size() * 4);
+	bufferData.insert(bufferData.end(), (float*)color.data(), (float*)color.data() + color.size() * 4);
 
 
 	glGenBuffers(1, &m_moleculesVBO);
@@ -60,6 +57,7 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	
 	//filling state
 	m_state.count = kMolecules;
+	m_state.radius = kParticleRad;
 
 	error = cudaGraphicsGLRegisterBuffer(&m_resource, m_moleculesVBO, cudaGraphicsRegisterFlagsNone);
 	assert(error == cudaSuccess);
@@ -71,21 +69,13 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	void* pVboData = nullptr;
 	error = cudaGraphicsResourceGetMappedPointer(&pVboData, &stateSize, m_resource);
 	assert(error == cudaSuccess);
-	m_state.pos = (float3*)pVboData;
+	m_state.pos = (float4*)pVboData;
 	m_state.color = m_state.pos + kMolecules;
-	m_state.radius = (float*)(m_state.color + kMolecules);
 
-
-	error = cudaMalloc(&m_state.vel, kMolecules * sizeof(float3));
+	error = cudaMalloc(&m_state.vel, kMolecules * sizeof(float4));
 	assert(error == cudaSuccess);
-	error = cudaMemcpy(m_state.vel, vel.data(), kMolecules * sizeof(float3), cudaMemcpyHostToDevice);
+	error = cudaMemcpy(m_state.vel, vel.data(), kMolecules * sizeof(float4), cudaMemcpyHostToDevice);
 	assert(error == cudaSuccess);
-
-	error = cudaMalloc(&m_state.mass, kMolecules * sizeof(float));
-	assert(error == cudaSuccess);
-	error = cudaMemcpy(m_state.mass, mass.data(), kMolecules * sizeof(float), cudaMemcpyHostToDevice);
-	assert(error == cudaSuccess);
-
 
 	m_cudaSim = ISimulation::CreateInstance(m_state);
 }
@@ -96,9 +86,6 @@ CScene::~CScene()
 
 	cudaError_t error;
 
-	error = cudaFree(m_state.mass);
-	assert(error == cudaSuccess);
-	
 	error = cudaFree(m_state.vel);
 	assert(error == cudaSuccess);
 
@@ -130,24 +117,21 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 
 	static const glm::vec4 lightDirection = glm::normalize(glm::vec4(1.0f, 1.0f, 1.0f, 0.0f));
 	m_spriteShader.SetUniform("pointScale", windowHeight / tanf(fov / 2.0f *  float(M_PI) / 180.0f));
+	m_spriteShader.SetUniform("radius", kParticleRad);
 	m_spriteShader.SetUniform("lightDir", (mvm * lightDirection).xyz);
 
 	glBindBuffer(GL_ARRAY_BUFFER, m_moleculesVBO);
 	auto posLoc = m_spriteShader.GetAttributeLocation("pos");
 	auto colorLoc = m_spriteShader.GetAttributeLocation("color");
-	auto radLoc = m_spriteShader.GetAttributeLocation("radius");
 
 	glEnableVertexAttribArray(posLoc);
 	glEnableVertexAttribArray(colorLoc);
-	glEnableVertexAttribArray(radLoc);
 
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glVertexAttribPointer(colorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void*)(kMolecules * sizeof(glm::vec3)));
-	glVertexAttribPointer(radLoc, 1, GL_FLOAT, GL_FALSE, 0, (void*)(2 * kMolecules * sizeof(glm::vec3)));
+	glVertexAttribPointer(posLoc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(colorLoc, 4, GL_FLOAT, GL_FALSE, 0, (void*)(kMolecules * sizeof(glm::vec4)));
 
 	glDrawArrays(GL_POINTS, 0, kMolecules);
 
-	glDisableVertexAttribArray(radLoc);
 	glDisableVertexAttribArray(colorLoc);
 	glDisableVertexAttribArray(posLoc);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

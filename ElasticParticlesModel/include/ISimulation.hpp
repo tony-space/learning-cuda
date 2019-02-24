@@ -9,13 +9,11 @@ struct SParticleSOA
 	size_t count;
 
 	//vector types
-	float3* __restrict__ pos;
-	float3* __restrict__ vel;
-	float3* __restrict__ color;
+	float4* __restrict__ pos;
+	float4* __restrict__ vel;
+	float4* __restrict__ color;
 	
-	//scalar types
-	float* __restrict__ radius;
-	float* __restrict__ mass;
+	float radius;
 };
 
 class __declspec(novtable) ISimulation

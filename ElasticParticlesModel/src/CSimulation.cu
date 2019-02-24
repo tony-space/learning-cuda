@@ -44,26 +44,26 @@ __global__ void resolveCollisionsKernel(
 	if (dt < collision.predictedTime)
 		return;
 
-	auto pos1 = particles.pos[collision.object1];
-	auto vel1 = particles.vel[collision.object1];
+	auto pos1 = make_float3(particles.pos[collision.object1]);
+	auto vel1 = make_float3(particles.vel[collision.object1]);
 
 	switch (collision.collisionType)
 	{
 	case SObjectsCollision::CollisionType::ParticleToPlane:
-		vel1 = reflect(vel1, pPlanes[collision.object2].normal);
+		vel1 = reflect(vel1, pPlanes[collision.object2].normal());
 		break;
 
 	case SObjectsCollision::CollisionType::ParticleToParticle:
-		auto pos2 = particles.pos[collision.object2];
-		auto vel2 = particles.vel[collision.object2];
+		auto pos2 = make_float3(particles.pos[collision.object2]);
+		auto vel2 = make_float3(particles.vel[collision.object2]);
 
 		resolveParticle2ParticleCollision(pos1, vel1, pos2, vel2);
-		particles.vel[collision.object2] = vel2;
+		particles.vel[collision.object2] = make_float4(vel2);
 
 		break;
 	}
 
-	particles.vel[collision.object1] = vel1;
+	particles.vel[collision.object1] = make_float4(vel1);
 }
 
 CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particles)

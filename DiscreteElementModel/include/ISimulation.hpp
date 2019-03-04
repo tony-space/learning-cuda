@@ -11,12 +11,13 @@ struct SParticleSOA
 	//vector types
 	float3* __restrict__ pos;
 	float3* __restrict__ vel;
-	float3* __restrict__ force;
 	float3* __restrict__ color;
+	float3* __restrict__ force;
 	
 	//scalar types
-	float* __restrict__ radius;
-	float* __restrict__ mass;
+	float radius;
+	float mass;
+	float maxDiameterFactor;
 };
 
 class __declspec(novtable) ISimulation

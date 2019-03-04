@@ -1,8 +1,8 @@
 uniform float pointScale;   // scale to calculate size in pixels
+uniform float radius;
 
 in vec3 pos;
 in vec3 color;
-in float radius;
 
 void main()
 {

@@ -12,12 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\ISimulation.hpp" />
-    <ClInclude Include="src\CCollisionDetector.hpp" />
     <ClInclude Include="src\CSimulation.hpp" />
     <ClInclude Include="src\SimulationTypes.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="src\CCollisionDetector.cu" />
     <CudaCompile Include="src\CSimulation.cu" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

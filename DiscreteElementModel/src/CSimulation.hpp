@@ -5,7 +5,6 @@
 
 #include "../include/ISimulation.hpp"
 #include "SimulationTypes.hpp"
-#include "CCollisionDetector.hpp"
 
 class CSimulation : public ISimulation
 {
@@ -16,7 +15,6 @@ public:
 	virtual float UpdateState(float dt) override;
 
 private:
-	std::unique_ptr<CCollisionDetector> m_collisionDetector;
 
 	SParticleSOA m_deviceParticles; //N particles
 

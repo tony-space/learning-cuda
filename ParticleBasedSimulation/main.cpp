@@ -154,7 +154,7 @@ int main(int argc, char** argv)
 	//glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_BORDERLESS | GLUT_CAPTIONLESS);
 	//glutInitWindowSize(1920, 1080);
 
-	glutCreateWindow("Ideal gas simulation");
+	glutCreateWindow("Sticky particles");
 
 	glutReshapeFunc(ReshapeFunc);
 	glutDisplayFunc(DisplayFunc);

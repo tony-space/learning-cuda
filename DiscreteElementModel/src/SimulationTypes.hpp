@@ -12,47 +12,6 @@ struct SPlane
 	}
 };
 
-struct SObjectsCollision
-{
-	enum class CollisionType : int
-	{
-		None,
-		ParticleToParticle,
-		ParticleToPlane
-	};
-
-	size_t object1 = size_t(-1);
-	size_t object2 = size_t(-1);
-	//predicted time interval when collision will happen
-	float predictedTime = INFINITY;
-
-	CollisionType collisionType = CollisionType::None;
-
-	static __device__ __host__ inline SObjectsCollision min(const SObjectsCollision& x, const SObjectsCollision& y)
-	{
-		return x.predictedTime < y.predictedTime ? x : y;
-	}
-
-	struct Comparator
-	{
-		__device__ __host__ inline SObjectsCollision operator()(const SObjectsCollision& x, const SObjectsCollision& y)
-		{
-			return SObjectsCollision::min(x,y);
-		}
-	};
-
-	__device__ inline void AnalyzeAndApply(const size_t obj1, const size_t obj2, float time, CollisionType type)
-	{
-		if (time < 0.0f) return;
-		if (time > predictedTime) return;
-
-		object1 = obj1;
-		object2 = obj2;
-		predictedTime = time;
-		collisionType = type;
-	}
-};
-
 template<typename T>
 static inline __device__ __host__ T divCeil(T a, T b)
 {

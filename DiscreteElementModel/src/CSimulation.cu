@@ -35,14 +35,15 @@ __global__ void rebuildSprings(const SParticleSOA particles, bool* __restrict__ 
 
 		auto r = particles.pos[i] - particles.pos[j];
 		auto magnitude = length(r);
-		auto diameter = particles.radius[i] + particles.radius[j];
-		if (!connected)
+		auto diameter = particles.radius * 2.0f;
+		//if (!connected)
+		//{
+		//	result = magnitude < diameter;
+		//}
+		//else
+		if (connected)
 		{
-			result = magnitude < diameter;
-		}
-		else
-		{
-			result = magnitude <= diameter * 1.25f;
+			result = magnitude <= diameter * particles.maxDiameterFactor;
 		}
 
 		//result = magnitude < diameter;
@@ -67,22 +68,21 @@ __global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __
 		bool connected = springsMat[matIndex];
 		auto pos1 = particles.pos[i];
 		auto pos2 = particles.pos[j];
-		auto mass1 = particles.mass[i];
-		auto mass2 = particles.mass[j];
 
 		auto r = pos1 - pos2;
 		auto magnitude = length(r);
-		auto diameter = particles.radius[i] + particles.radius[j];
+		auto diameter = particles.radius * 2.0f;
 
-		if (!connected && magnitude > diameter)
-		{
-			constexpr float k = 8e-7f;
-			result = -k * mass1 * mass2 * r / (magnitude * magnitude * magnitude);
-		}
-		else
+		//if (!connected && magnitude > diameter)
+		//{
+		//	constexpr float k = 8e-7f;
+		//	result = -k * particles.mass * particles.mass * r / (magnitude * magnitude * magnitude);
+		//}
+		//else
+		if (connected || magnitude < diameter)
 		{
 			constexpr float stiffness = 7000.0f;
-			constexpr float damp = 50.0f;
+			constexpr float damp = 25.0f;
 
 			auto delta = magnitude - diameter;
 
@@ -98,7 +98,7 @@ __global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __
 	forcesMat[matIndex] = result;
 }
 
-__global__ void moveParticlesKernel2(SParticleSOA particles, const SPlane* __restrict__ planes, const size_t planesCount, const float dt)
+__global__ void moveParticlesKernel(SParticleSOA particles, const SPlane* __restrict__ planes, const size_t planesCount, const float dt)
 {
 	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId >= particles.count)
@@ -107,16 +107,14 @@ __global__ void moveParticlesKernel2(SParticleSOA particles, const SPlane* __res
 	auto pos = particles.pos[threadId];
 	auto vel = particles.vel[threadId];
 	auto force = particles.force[threadId];
-	auto mass = particles.mass[threadId];
-	auto radius = particles.radius[threadId];
 
 	pos += vel * dt;
-	vel += force * dt / mass;
+	vel += force * dt / particles.mass;
 
 	for (size_t i = 0; i < planesCount; ++i)
 	{
 		SPlane p = planes[i];
-		if (p.Distance(pos, radius) >= 0.0f)
+		if (p.Distance(pos, particles.radius) >= 0.0f)
 			continue;
 
 		if (dot(p.normal, vel) >= 0.0f)
@@ -128,6 +126,7 @@ __global__ void moveParticlesKernel2(SParticleSOA particles, const SPlane* __res
 
 	particles.pos[threadId] = pos;
 	particles.vel[threadId] = vel;
+	particles.color[threadId] = getHeatMapColor(logf(length(force) + 1.0f) / 8.0f + 0.15f);
 }
 
 __device__ void resolveParticle2ParticleCollision(const float3& pos1, float3& vel1, const float3& pos2, float3& vel2)
@@ -145,57 +144,6 @@ __device__ void resolveParticle2ParticleCollision(const float3& pos1, float3& ve
 	vel2 = v2 + centerOfMassVel;
 }
 
-__global__ void moveParticlesKernel(SParticleSOA particles, float dt, const SObjectsCollision* __restrict__ earilestCollision)
-{
-	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particles.count)
-		return;
-
-	dt = fminf(earilestCollision->predictedTime, dt);
-
-	auto pos = particles.pos[threadId];
-	auto vel = particles.vel[threadId];
-
-	pos += vel * dt;
-	particles.pos[threadId] = pos;
-
-	//vel.y -= 1.0f * dt;
-	//particles.vel[threadId] = vel;
-}
-
-__global__ void resolveCollisionsKernel(
-	SParticleSOA particles,
-	const float dt,
-	const SObjectsCollision* __restrict__ pEarilestCollision,
-	const SPlane* __restrict__ pPlanes)
-{
-	auto collision = *pEarilestCollision;
-
-	if (dt < collision.predictedTime)
-		return;
-
-	auto pos1 = particles.pos[collision.object1];
-	auto vel1 = particles.vel[collision.object1];
-
-	switch (collision.collisionType)
-	{
-	case SObjectsCollision::CollisionType::ParticleToPlane:
-		vel1 = reflect(vel1, pPlanes[collision.object2].normal);
-		break;
-
-	case SObjectsCollision::CollisionType::ParticleToParticle:
-		auto pos2 = particles.pos[collision.object2];
-		auto vel2 = particles.vel[collision.object2];
-
-		resolveParticle2ParticleCollision(pos1, vel1, pos2, vel2);
-		particles.vel[collision.object2] = vel2;
-
-		break;
-	}
-
-	particles.vel[collision.object1] = vel1;
-}
-
 CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particles)
 {
 	thrust::host_vector<SPlane> hostPlanes;
@@ -207,12 +155,10 @@ CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particl
 	hostPlanes.push_back(SPlane(make_float3(0.0, 0.0, -1.0), -0.5));
 	m_devicePlanes = hostPlanes;
 
-	m_collisionDetector = std::make_unique<CCollisionDetector>(m_deviceParticles, hostPlanes);
-
 	auto matSize = m_deviceParticles.count * m_deviceParticles.count;
 
 	m_deviceForcesMatrix.resize(matSize, make_float3(0.0f));
-	m_deviceSpringsMatrix.resize(matSize, false);
+	m_deviceSpringsMatrix.resize(matSize, true);
 
 	thrust::host_vector<size_t> hostSegments(m_deviceParticles.count + 1);
 	for (size_t i = 0; i < m_deviceParticles.count + 1; ++i)
@@ -220,19 +166,6 @@ CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particl
 
 	m_deviceReductionSegments = hostSegments;
 }
-
-//float CSimulation::UpdateState(float dt)
-//{
-//	dim3 blockDim(64);
-//	dim3 gridDim((unsigned(m_deviceParticles.count) - 1) / blockDim.x + 1);
-//
-//	auto d_earliestCollistion = m_collisionDetector->FindEarliestCollision();
-//
-//	moveParticlesKernel << <gridDim, blockDim >> > (m_deviceParticles, dt, d_earliestCollistion);
-//	resolveCollisionsKernel <<<1, 1 >>> (m_deviceParticles, dt, d_earliestCollistion, m_collisionDetector->GetPlanes());
-//
-//	return dt;
-//}
 
 float CSimulation::UpdateState(float dt)
 {
@@ -265,7 +198,7 @@ float CSimulation::UpdateState(float dt)
 	blockDim = dim3(64);
 	gridDim = dim3((unsigned(m_deviceParticles.count) - 1) / blockDim.x + 1);
 
-	moveParticlesKernel2 <<<gridDim, blockDim >>> (m_deviceParticles, m_devicePlanes.data().get(), m_devicePlanes.size(), dt);
+	moveParticlesKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_devicePlanes.data().get(), m_devicePlanes.size(), dt);
 
 	return dt;
 }

@@ -17,9 +17,9 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	GLenum glError;
 	cudaError_t error;
 
-	std::vector<glm::vec3> pos(kMolecules);
-	std::vector<glm::vec3> vel(kMolecules);
-	std::vector<glm::vec3> color(kMolecules);
+	std::vector<glm::vec4> pos(kMolecules);
+	std::vector<glm::vec4> vel(kMolecules);
+	std::vector<glm::vec4> color(kMolecules);
 
 
 	for (size_t i = 0; i < kMolecules; ++i)
@@ -29,12 +29,13 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 
 		pos[i].x = glm::linearRand(-0.15f, 0.15f);
 		pos[i].yz = glm::circularRand(0.015f);
+		pos[i].w = 1.0f;
 
 		if (glm::linearRand(0.0f, 1.0f) > 0.5f)
 		{
 			glm::mat4 m = glm::identity<glm::mat4>();
 			m = glm::rotate(m, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			pos[i] = m * glm::vec4(pos[i], 1.0f);
+			pos[i] = m * pos[i];
 
 			pos[i].x += 0.4f;
 			vel[i].x -= 1.0f;
@@ -43,40 +44,16 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 		{
 			glm::mat4 m = glm::identity<glm::mat4>();
 			m = glm::rotate(m, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-			pos[i] = m * glm::vec4(pos[i], 1.0f);
+			pos[i] = m * pos[i];
 
 			pos[i].x -= 0.4f;
 			vel[i].x += 1.0f;
 		}
 	}
 
-	//for (size_t i = 0; i < kMolecules; ++i)
-	//{
-	//	if (glm::linearRand(0.0f, 20.0f) < 19.0f)
-	//	{
-	//		pos[i] = glm::vec3
-	//		(
-	//			glm::linearRand(-0.01f, 0.01f),
-	//			glm::linearRand(-0.15f, 0.15f),
-	//			glm::linearRand(-0.15f, 0.15f)
-	//		);
-
-	//		pos[i].x -= 0.35f;
-	//	}
-	//	else
-	//	{
-	//		//pos[i] = glm::sphericalRand(0.01f);
-	//		pos[i].x = glm::linearRand(0.0f, 0.1f);
-	//		pos[i].yz = glm::circularRand(0.01f);
-
-	//		pos[i].x += 0.35f;
-	//		vel[i].x = -2.5f;
-	//	}
-	//}
-
 	std::vector<float> bufferData;
-	bufferData.insert(bufferData.end(), (float*)pos.data(), (float*)pos.data() + pos.size() * 3);
-	bufferData.insert(bufferData.end(), (float*)color.data(), (float*)color.data() + color.size() * 3);
+	bufferData.insert(bufferData.end(), (float*)pos.data(), (float*)pos.data() + pos.size() * 4);
+	bufferData.insert(bufferData.end(), (float*)color.data(), (float*)color.data() + color.size() * 4);
 
 
 	glGenBuffers(1, &m_moleculesVBO);
@@ -100,20 +77,20 @@ CScene::CScene() : m_spriteShader("shaders\\vertex.glsl", "shaders\\fragment.gls
 	void* pVboData = nullptr;
 	error = cudaGraphicsResourceGetMappedPointer(&pVboData, &stateSize, m_resource);
 	assert(error == cudaSuccess);
-	m_state.pos = (float3*)pVboData;
+	m_state.pos = (float4*)pVboData;
 	m_state.color = m_state.pos + kMolecules;
 	m_state.radius = kParticleRad;
 	m_state.mass = 1.0f;
 	m_state.maxDiameterFactor = 1.75f;
 
 
-	error = cudaMalloc(&m_state.vel, kMolecules * sizeof(float3));
+	error = cudaMalloc(&m_state.vel, kMolecules * sizeof(float4));
 	assert(error == cudaSuccess);
-	error = cudaMemcpy(m_state.vel, vel.data(), kMolecules * sizeof(float3), cudaMemcpyHostToDevice);
+	error = cudaMemcpy(m_state.vel, vel.data(), kMolecules * sizeof(float4), cudaMemcpyHostToDevice);
 	assert(error == cudaSuccess);
 
 	//no need to copy forces
-	error = cudaMalloc(&m_state.force, kMolecules * sizeof(float3));
+	error = cudaMalloc(&m_state.force, kMolecules * sizeof(float4));
 	assert(error == cudaSuccess);
 
 
@@ -170,8 +147,8 @@ void CScene::Render(float windowHeight, float fov, glm::mat4 mvm)
 	glEnableVertexAttribArray(posLoc);
 	glEnableVertexAttribArray(colorLoc);
 
-	glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glVertexAttribPointer(colorLoc, 3, GL_FLOAT, GL_FALSE, 0, (void*)(kMolecules * sizeof(glm::vec3)));
+	glVertexAttribPointer(posLoc, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(colorLoc, 4, GL_FLOAT, GL_FALSE, 0, (void*)(kMolecules * sizeof(glm::vec4)));
 
 	glDrawArrays(GL_POINTS, 0, kMolecules);
 

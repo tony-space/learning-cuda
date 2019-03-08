@@ -4,7 +4,7 @@
 #include "CSimulation.hpp"
 #include <cub/device/device_segmented_reduce.cuh>
 
-__device__ float3 getHeatMapColor(float value)
+__device__ float4 getHeatMapColor(float value)
 {
 	value = fminf(fmaxf(value, 0.0f), 1.0f);
 
@@ -14,7 +14,7 @@ __device__ float3 getHeatMapColor(float value)
 	int idx1 = int(value);
 	int idx2 = idx1 + 1;
 	float fract1 = value - float(idx1);
-	return heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]);
+	return make_float4(heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]), 1.0f);
 }
 
 
@@ -52,7 +52,7 @@ __global__ void rebuildSprings(const SParticleSOA particles, bool* __restrict__ 
 	springsMat[matIndex] = result;
 }
 
-__global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __restrict__ springsMat, float3* __restrict__ forcesMat)
+__global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __restrict__ springsMat, float4* __restrict__ forcesMat)
 {
 	auto i = blockIdx.y * blockDim.y + threadIdx.y;
 	auto j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,7 +61,7 @@ __global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __
 
 	auto matIndex = i * particles.count + j;
 
-	float3 result = make_float3(0.0f);
+	auto result = make_float4(0.0f);
 
 	if (i != j)
 	{
@@ -104,9 +104,9 @@ __global__ void moveParticlesKernel(SParticleSOA particles, const SPlane* __rest
 	if (threadId >= particles.count)
 		return;
 
-	auto pos = particles.pos[threadId];
-	auto vel = particles.vel[threadId];
-	auto force = particles.force[threadId];
+	float3 pos = make_float3(particles.pos[threadId]);
+	float3 vel = make_float3(particles.vel[threadId]);
+	float3 force = make_float3(particles.force[threadId]);
 
 	pos += vel * dt;
 	vel += force * dt / particles.mass;
@@ -124,8 +124,8 @@ __global__ void moveParticlesKernel(SParticleSOA particles, const SPlane* __rest
 		break;
 	}
 
-	particles.pos[threadId] = pos;
-	particles.vel[threadId] = vel;
+	particles.pos[threadId] = make_float4(pos, 1.0f);
+	particles.vel[threadId] = make_float4(vel, 1.0f);
 	particles.color[threadId] = getHeatMapColor(logf(length(force) + 1.0f) / 8.0f + 0.15f);
 }
 
@@ -157,7 +157,7 @@ CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particl
 
 	auto matSize = m_deviceParticles.count * m_deviceParticles.count;
 
-	m_deviceForcesMatrix.resize(matSize, make_float3(0.0f));
+	m_deviceForcesMatrix.resize(matSize, make_float4(0.0f));
 	m_deviceSpringsMatrix.resize(matSize, true);
 
 	thrust::host_vector<size_t> hostSegments(m_deviceParticles.count + 1);

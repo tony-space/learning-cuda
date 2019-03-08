@@ -53,7 +53,7 @@ void DisplayFunc()
 	if (__timeCounter > 0.5f)
 	{
 		std::stringstream str;
-		str << "Ideal gas simulation FPS: " << int(1.0f / g_deltaTime);
+		str << "Sticky particles FPS: " << int(1.0f / g_deltaTime);
 		glutSetWindowTitle(str.str().c_str());
 		__timeCounter = 0.0f;
 	}

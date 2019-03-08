@@ -16,14 +16,14 @@
     <ClCompile Include="CShaderProgram.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DiscreteElementModel\DiscreteElementModel.vcxproj">
-      <Project>{307dbb61-7c31-4644-a901-b61224e16f6e}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\third-party\freeglut\freeglut.vcxproj">
+    <ProjectReference Include="..\..\third-party\freeglut\freeglut.vcxproj">
       <Project>{980bb1e1-6757-47c8-9c2a-323ac3a199f2}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\third-party\glew\glew.vcxproj">
+    <ProjectReference Include="..\..\third-party\glew\glew.vcxproj">
       <Project>{69c05666-4e44-4da6-bdb4-058bac0a4b2b}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ElasticParticlesModel\ElasticParticlesModel.vcxproj">
+      <Project>{5563dad8-697a-4734-a4e7-234b59a5b70d}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -35,8 +35,8 @@
     <ClInclude Include="CShaderProgram.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{929f49eb-b16a-4448-9ad4-ce229c6b969e}</ProjectGuid>
-    <RootNamespace>ParticleBasedSimulation</RootNamespace>
+    <ProjectGuid>{38804A48-652A-4C03-9C2F-2237ED237E02}</ProjectGuid>
+    <RootNamespace>IdealGasSimulation</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -66,10 +66,10 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)DiscreteElementModel\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)PreciseCollisionPrediction\ElasticParticlesModel\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)DiscreteElementModel\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)third-party\nvidia;$(SolutionDir)PreciseCollisionPrediction\ElasticParticlesModel\include;$(SolutionDir)third-party\glm\glm-0.9.9.3;$(SolutionDir)third-party\glew\glew-2.1.0\include;$(SolutionDir)third-party\freeglut\freeglut-3.0.0\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

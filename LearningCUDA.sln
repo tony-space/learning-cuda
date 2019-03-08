@@ -13,21 +13,21 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "StaticElectricField", "Stat
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SimpleRayTracer", "SimpleRayTracer\SimpleRayTracer.vcxproj", "{533C2CE5-808D-42B4-BF06-944559CC3E99}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasSimulation", "IdealGasSimulation\IdealGasSimulation.vcxproj", "{38804A48-652A-4C03-9C2F-2237ED237E02}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ElasticParticlesModel", "ElasticParticlesModel\ElasticParticlesModel.vcxproj", "{5563DAD8-697A-4734-A4E7-234B59A5B70D}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AdvancedReduction", "AdvancedReduction\AdvancedReduction.vcxproj", "{1C6353B8-1F90-4CEF-A387-96C7B23FB8F3}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DiscreteElementModel", "DiscreteElementModel\DiscreteElementModel.vcxproj", "{307DBB61-7C31-4644-A901-B61224E16F6E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DiscreteElementModel", "DEM\DiscreteElementModel\DiscreteElementModel.vcxproj", "{307DBB61-7C31-4644-A901-B61224E16F6E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ParticleBasedSimulation", "ParticleBasedSimulation\ParticleBasedSimulation.vcxproj", "{929F49EB-B16A-4448-9AD4-CE229C6B969E}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasOffline", "IdealGasOffline\IdealGasOffline.vcxproj", "{537C92AD-6F3F-4377-930B-25BF1885B712}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ParticleBasedSimulation", "DEM\ParticleBasedSimulation\ParticleBasedSimulation.vcxproj", "{929F49EB-B16A-4448-9AD4-CE229C6B969E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ElasticParticlesModel", "ElasticParticlesModel", "{F7AAC15B-B2AE-4456-868E-D8D548330550}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DEM", "DEM", "{430B2B84-0B74-4B3C-8C15-F61262B5F3E8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ElasticParticlesModel", "PreciseCollisionPrediction\ElasticParticlesModel\ElasticParticlesModel.vcxproj", "{5563DAD8-697A-4734-A4E7-234B59A5B70D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasOffline", "PreciseCollisionPrediction\IdealGasOffline\IdealGasOffline.vcxproj", "{537C92AD-6F3F-4377-930B-25BF1885B712}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasSimulation", "PreciseCollisionPrediction\IdealGasSimulation\IdealGasSimulation.vcxproj", "{38804A48-652A-4C03-9C2F-2237ED237E02}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -65,18 +65,6 @@ Global
 		{533C2CE5-808D-42B4-BF06-944559CC3E99}.Release|x64.ActiveCfg = Release|x64
 		{533C2CE5-808D-42B4-BF06-944559CC3E99}.Release|x64.Build.0 = Release|x64
 		{533C2CE5-808D-42B4-BF06-944559CC3E99}.Release|x86.ActiveCfg = Release|x64
-		{38804A48-652A-4C03-9C2F-2237ED237E02}.Debug|x64.ActiveCfg = Debug|x64
-		{38804A48-652A-4C03-9C2F-2237ED237E02}.Debug|x64.Build.0 = Debug|x64
-		{38804A48-652A-4C03-9C2F-2237ED237E02}.Debug|x86.ActiveCfg = Debug|x64
-		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.ActiveCfg = Release|x64
-		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.Build.0 = Release|x64
-		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x86.ActiveCfg = Release|x64
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x64.ActiveCfg = Debug|x64
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x64.Build.0 = Debug|x64
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x86.ActiveCfg = Debug|x64
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x64.ActiveCfg = Release|x64
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x64.Build.0 = Release|x64
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x86.ActiveCfg = Release|x64
 		{1C6353B8-1F90-4CEF-A387-96C7B23FB8F3}.Debug|x64.ActiveCfg = Debug|x64
 		{1C6353B8-1F90-4CEF-A387-96C7B23FB8F3}.Debug|x64.Build.0 = Debug|x64
 		{1C6353B8-1F90-4CEF-A387-96C7B23FB8F3}.Debug|x86.ActiveCfg = Debug|x64
@@ -95,6 +83,12 @@ Global
 		{929F49EB-B16A-4448-9AD4-CE229C6B969E}.Release|x64.ActiveCfg = Release|x64
 		{929F49EB-B16A-4448-9AD4-CE229C6B969E}.Release|x64.Build.0 = Release|x64
 		{929F49EB-B16A-4448-9AD4-CE229C6B969E}.Release|x86.ActiveCfg = Release|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x64.ActiveCfg = Debug|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x64.Build.0 = Debug|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Debug|x86.ActiveCfg = Debug|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x64.ActiveCfg = Release|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x64.Build.0 = Release|x64
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D}.Release|x86.ActiveCfg = Release|x64
 		{537C92AD-6F3F-4377-930B-25BF1885B712}.Debug|x64.ActiveCfg = Debug|x64
 		{537C92AD-6F3F-4377-930B-25BF1885B712}.Debug|x64.Build.0 = Debug|x64
 		{537C92AD-6F3F-4377-930B-25BF1885B712}.Debug|x86.ActiveCfg = Debug|Win32
@@ -103,6 +97,12 @@ Global
 		{537C92AD-6F3F-4377-930B-25BF1885B712}.Release|x64.Build.0 = Release|x64
 		{537C92AD-6F3F-4377-930B-25BF1885B712}.Release|x86.ActiveCfg = Release|Win32
 		{537C92AD-6F3F-4377-930B-25BF1885B712}.Release|x86.Build.0 = Release|Win32
+		{38804A48-652A-4C03-9C2F-2237ED237E02}.Debug|x64.ActiveCfg = Debug|x64
+		{38804A48-652A-4C03-9C2F-2237ED237E02}.Debug|x64.Build.0 = Debug|x64
+		{38804A48-652A-4C03-9C2F-2237ED237E02}.Debug|x86.ActiveCfg = Debug|x64
+		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.ActiveCfg = Release|x64
+		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.Build.0 = Release|x64
+		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -110,11 +110,11 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{980BB1E1-6757-47C8-9C2A-323AC3A199F2} = {FF5ADA67-766F-4CC0-B669-5E697537A79C}
 		{69C05666-4E44-4DA6-BDB4-058BAC0A4B2B} = {FF5ADA67-766F-4CC0-B669-5E697537A79C}
-		{38804A48-652A-4C03-9C2F-2237ED237E02} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
-		{5563DAD8-697A-4734-A4E7-234B59A5B70D} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
 		{307DBB61-7C31-4644-A901-B61224E16F6E} = {430B2B84-0B74-4B3C-8C15-F61262B5F3E8}
 		{929F49EB-B16A-4448-9AD4-CE229C6B969E} = {430B2B84-0B74-4B3C-8C15-F61262B5F3E8}
+		{5563DAD8-697A-4734-A4E7-234B59A5B70D} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
 		{537C92AD-6F3F-4377-930B-25BF1885B712} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
+		{38804A48-652A-4C03-9C2F-2237ED237E02} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2E14C16A-5C0D-404F-BBD4-7DD0C51A0787}

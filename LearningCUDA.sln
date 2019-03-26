@@ -29,6 +29,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasOffline", "PreciseC
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasSimulation", "PreciseCollisionPrediction\IdealGasSimulation\IdealGasSimulation.vcxproj", "{38804A48-652A-4C03-9C2F-2237ED237E02}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Voxelizer", "Voxelizer\Voxelizer.vcxproj", "{E48A0788-2669-40ED-B802-C90D26B78479}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -103,6 +105,14 @@ Global
 		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.ActiveCfg = Release|x64
 		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x64.Build.0 = Release|x64
 		{38804A48-652A-4C03-9C2F-2237ED237E02}.Release|x86.ActiveCfg = Release|x64
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Debug|x64.ActiveCfg = Debug|x64
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Debug|x64.Build.0 = Debug|x64
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Debug|x86.ActiveCfg = Debug|Win32
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Debug|x86.Build.0 = Debug|Win32
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x64.ActiveCfg = Release|x64
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x64.Build.0 = Release|x64
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x86.ActiveCfg = Release|Win32
+		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

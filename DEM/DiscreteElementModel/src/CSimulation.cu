@@ -2,7 +2,10 @@
 #include <device_launch_parameters.h>
 #include <cassert>
 #include "CSimulation.hpp"
-#include <cub/device/device_segmented_reduce.cuh>
+
+#include <cub/device/device_radix_sort.cuh>
+
+constexpr unsigned kBlockDim = 128u;
 
 __device__ float4 getHeatMapColor(float value)
 {
@@ -15,118 +18,6 @@ __device__ float4 getHeatMapColor(float value)
 	int idx2 = idx1 + 1;
 	float fract1 = value - float(idx1);
 	return make_float4(heatMap[idx1] + fract1 * (heatMap[idx2] - heatMap[idx1]), 1.0f);
-}
-
-
-__global__ void rebuildSprings(const SParticleSOA particles, bool* __restrict__ springsMat)
-{
-	auto i = blockIdx.y * blockDim.y + threadIdx.y;
-	auto j = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= particles.count || j >= particles.count)
-		return;
-
-	bool result = false;
-
-	auto matIndex = i * particles.count + j;
-
-	if (i != j)
-	{
-		auto connected = springsMat[matIndex];
-
-		auto r = particles.pos[i] - particles.pos[j];
-		auto magnitude = length(r);
-		auto diameter = particles.radius * 2.0f;
-		//if (!connected)
-		//{
-		//	result = magnitude < diameter;
-		//}
-		//else
-		if (connected)
-		{
-			result = magnitude <= diameter * particles.maxDiameterFactor;
-		}
-
-		//result = magnitude < diameter;
-	}
-
-	springsMat[matIndex] = result;
-}
-
-__global__ void computeForcesMatrix(const SParticleSOA particles, const bool* __restrict__ springsMat, float4* __restrict__ forcesMat)
-{
-	auto i = blockIdx.y * blockDim.y + threadIdx.y;
-	auto j = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= particles.count || j >= particles.count)
-		return;
-
-	auto matIndex = i * particles.count + j;
-
-	auto result = make_float4(0.0f);
-
-	if (i != j)
-	{
-		bool connected = springsMat[matIndex];
-		auto pos1 = particles.pos[i];
-		auto pos2 = particles.pos[j];
-
-		auto r = pos1 - pos2;
-		auto magnitude = length(r);
-		auto diameter = particles.radius * 2.0f;
-
-		//if (!connected && magnitude > diameter)
-		//{
-		//	constexpr float k = 8e-7f;
-		//	result = -k * particles.mass * particles.mass * r / (magnitude * magnitude * magnitude);
-		//}
-		//else
-		if (connected || magnitude < diameter)
-		{
-			constexpr float stiffness = 7000.0f;
-			constexpr float damp = 25.0f;
-
-			auto delta = magnitude - diameter;
-
-			auto vel1 = particles.vel[i];
-			auto vel2 = particles.vel[j];
-
-			auto v = dot(vel1 - vel2, r / magnitude);
-
-			result = (-r / magnitude) * (delta * stiffness + v * damp);
-		}
-	}
-
-	forcesMat[matIndex] = result;
-}
-
-__global__ void moveParticlesKernel(SParticleSOA particles, const SPlane* __restrict__ planes, const size_t planesCount, const float dt)
-{
-	auto threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId >= particles.count)
-		return;
-
-	float3 pos = make_float3(particles.pos[threadId]);
-	float3 vel = make_float3(particles.vel[threadId]);
-	float3 force = make_float3(particles.force[threadId]);
-
-	pos += vel * dt;
-	vel += force * dt / particles.mass;
-
-	for (size_t i = 0; i < planesCount; ++i)
-	{
-		SPlane p = planes[i];
-		if (p.Distance(pos, particles.radius) >= 0.0f)
-			continue;
-
-		if (dot(p.normal, vel) >= 0.0f)
-			continue;
-
-		vel = reflect(vel, p.normal);
-		break;
-	}
-
-	particles.pos[threadId] = make_float4(pos, 1.0f);
-	particles.vel[threadId] = make_float4(vel, 1.0f);
-	particles.color[threadId] = getHeatMapColor(logf(length(force) + 1.0f) / 8.0f + 0.15f);
 }
 
 __device__ void resolveParticle2ParticleCollision(const float3& pos1, float3& vel1, const float3& pos2, float3& vel2)
@@ -144,6 +35,41 @@ __device__ void resolveParticle2ParticleCollision(const float3& pos1, float3& ve
 	vel2 = v2 + centerOfMassVel;
 }
 
+__global__ void getCellIdKernel(const SParticleSOA particles, size_t* __restrict__ particleId, size_t* __restrict__ cellId)
+{
+	auto threadId = size_t(blockDim.x * blockIdx.x + threadIdx.x);
+	if (threadId >= particles.count)
+		return;
+
+	auto pos = particles.pos[threadId];
+
+	constexpr auto worldDim = 2.0f; //from -1.0 to 1.0
+	pos += make_float4(1.0f);//make each coordinate to be from 0 to 2.0f
+	
+	auto cellDim = particles.radius * 2.0f;
+	auto cellsPerDim = size_t(ceilf(worldDim / cellDim));
+
+	//compute integer indices of the current cell
+	auto idx = size_t(floorf(pos.x / cellDim));
+	auto idy = size_t(floorf(pos.y / cellDim));
+	auto idz = size_t(floorf(pos.z / cellDim));
+
+	particleId[threadId] = threadId;
+	cellId[threadId] = idz * cellsPerDim * cellsPerDim + idy * cellsPerDim + idx;
+}
+
+__global__ void reorderParticlesKernel(const size_t* __restrict__ particleId, SParticleSOA particles)
+{
+	auto threadId = size_t(blockDim.x * blockIdx.x + threadIdx.x);
+	if (threadId >= particles.count)
+		return;
+
+	float4 buf;
+	size_t idx = particleId[threadId];
+
+	buf = particles.pos[idx];
+}
+
 CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particles)
 {
 	thrust::host_vector<SPlane> hostPlanes;
@@ -155,52 +81,61 @@ CSimulation::CSimulation(SParticleSOA d_particles) : m_deviceParticles(d_particl
 	hostPlanes.push_back(SPlane(make_float3(0.0, 0.0, -1.0), -0.5));
 	m_devicePlanes = hostPlanes;
 
-	auto matSize = m_deviceParticles.count * m_deviceParticles.count;
-
-	m_deviceForcesMatrix.resize(matSize, make_float4(0.0f));
-	m_deviceSpringsMatrix.resize(matSize, true);
-
-	thrust::host_vector<size_t> hostSegments(m_deviceParticles.count + 1);
-	for (size_t i = 0; i < m_deviceParticles.count + 1; ++i)
-		hostSegments[i] = i * m_deviceParticles.count;
-
-	m_deviceReductionSegments = hostSegments;
+	m_deviceParticleIdx.resize(d_particles.count);
+	m_deviceCellIdx.resize(d_particles.count);
+	m_deviceParticleIdxAlt.resize(d_particles.count);
+	m_deviceCellIdxAlt.resize(d_particles.count);
 }
 
 float CSimulation::UpdateState(float dt)
 {
-	cudaError_t cudaStatus;
-	auto blocks = unsigned((m_deviceParticles.count - 1) / 32 + 1);
+	dim3 blockDim(kBlockDim);
+	dim3 gridDim(unsigned((m_deviceParticles.count - 1) / kBlockDim + 1));
 
-	dim3 blockDim(32, 32);
-	dim3 gridDim(blocks, blocks);
+	auto d_particleIdx = m_deviceParticleIdx.data().get();
+	auto d_cellIdx = m_deviceCellIdx.data().get();
 
-	rebuildSprings <<<gridDim, blockDim >>> (m_deviceParticles, m_deviceSpringsMatrix.data().get());
+	getCellIdKernel <<<gridDim, blockDim >>> (m_deviceParticles, d_particleIdx, d_cellIdx);
 
-	computeForcesMatrix <<<gridDim, blockDim >>> (m_deviceParticles, m_deviceSpringsMatrix.data().get(), m_deviceForcesMatrix.data().get());
-
-	size_t storageBytes = 0;
-	cudaStatus = cub::DeviceSegmentedReduce::Sum(
-		nullptr, storageBytes,
-		m_deviceForcesMatrix.data().get(), m_deviceParticles.force,
-		int(m_deviceParticles.count), m_deviceReductionSegments.data().get(), m_deviceReductionSegments.data().get() + 1);
-	assert(cudaStatus == cudaSuccess);
-
-	if (m_segmentedReductionStorage.size() != storageBytes)
-		m_segmentedReductionStorage.resize(storageBytes);
-
-	cudaStatus = cub::DeviceSegmentedReduce::Sum(
-		m_segmentedReductionStorage.data().get(), storageBytes,
-		m_deviceForcesMatrix.data().get(), m_deviceParticles.force,
-		int(m_deviceParticles.count), m_deviceReductionSegments.data().get(), m_deviceReductionSegments.data().get() + 1);
-	assert(cudaStatus == cudaSuccess);
-
-	blockDim = dim3(64);
-	gridDim = dim3((unsigned(m_deviceParticles.count) - 1) / blockDim.x + 1);
-
-	moveParticlesKernel <<<gridDim, blockDim >>> (m_deviceParticles, m_devicePlanes.data().get(), m_devicePlanes.size(), dt);
+	SortAndReorder();
 
 	return dt;
+}
+
+void CSimulation::SortAndReorder()
+{
+	cudaError status;
+	dim3 blockDim(kBlockDim);
+	dim3 gridDim(unsigned((m_deviceParticles.count - 1) / kBlockDim + 1));
+
+	auto d_particleIdx = m_deviceParticleIdx.data().get();
+	auto d_particleIdxAlt = m_deviceParticleIdxAlt.data().get();
+	auto d_cellIdx = m_deviceCellIdx.data().get();
+	auto d_cellIdxAlt = m_deviceCellIdxAlt.data().get();
+
+	cub::DoubleBuffer<size_t> d_keys(d_cellIdx, d_cellIdxAlt);
+	cub::DoubleBuffer<size_t> d_values(d_particleIdx, d_particleIdxAlt);
+
+	void* d_tempStorage = nullptr;
+	size_t tempStorageSize = 0;
+	int elements = int(m_deviceParticles.count);
+
+	status = cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageSize, d_keys, d_values, elements);
+	assert(status == cudaSuccess);
+	if (tempStorageSize > m_cubDataStorage.size())
+		m_cubDataStorage.resize(tempStorageSize);
+
+	d_tempStorage = m_cubDataStorage.data().get();
+	status = cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageSize, d_keys, d_values, elements);
+	assert(status == cudaSuccess);
+
+	if (d_keys.Current() == d_cellIdxAlt)
+	{
+		typedef thrust::device_ptr<size_t> ptr;
+		thrust::copy(ptr(d_cellIdxAlt), ptr(d_cellIdxAlt + m_deviceParticles.count), ptr(d_cellIdx));
+	}
+
+	reorderParticlesKernel <<<gridDim, blockDim >>> (d_values.Current(), m_deviceParticles);
 }
 
 std::unique_ptr<ISimulation> ISimulation::CreateInstance(SParticleSOA d_particles)

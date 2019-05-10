@@ -15,15 +15,16 @@ public:
 	virtual float UpdateState(float dt) override;
 
 private:
-
 	SParticleSOA m_deviceParticles; //N particles
-
 	thrust::device_vector<SPlane> m_devicePlanes;
-
-	thrust::device_vector<float4> m_deviceForcesMatrix; //NxN elements
 	
-	thrust::device_vector<size_t> m_deviceReductionSegments; // used by CUB library
-	thrust::device_vector<uint8_t> m_segmentedReductionStorage; //an intermediate storage, used by CUB library for reduction puproses
+	thrust::device_vector<uint8_t> m_cubDataStorage;//used by CUB library for the internal purposes
 
-	thrust::device_vector<bool> m_deviceSpringsMatrix; //NxN elements
+	//sorting part. CUB library switches between these buffers during radix sort
+	thrust::device_vector<size_t> m_deviceParticleIdx;
+	thrust::device_vector<size_t> m_deviceCellIdx;
+	thrust::device_vector<size_t> m_deviceParticleIdxAlt;
+	thrust::device_vector<size_t> m_deviceCellIdxAlt;
+
+	void SortAndReorder();
 };

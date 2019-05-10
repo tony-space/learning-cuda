@@ -19,7 +19,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DiscreteElementModel", "DEM
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ParticleBasedSimulation", "DEM\ParticleBasedSimulation\ParticleBasedSimulation.vcxproj", "{929F49EB-B16A-4448-9AD4-CE229C6B969E}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ElasticParticlesModel", "ElasticParticlesModel", "{F7AAC15B-B2AE-4456-868E-D8D548330550}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PreciseCollisionPrediction", "PreciseCollisionPrediction", "{F7AAC15B-B2AE-4456-868E-D8D548330550}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DEM", "DEM", "{430B2B84-0B74-4B3C-8C15-F61262B5F3E8}"
 EndProject
@@ -30,6 +30,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IdealGasSimulation", "PreciseCollisionPrediction\IdealGasSimulation\IdealGasSimulation.vcxproj", "{38804A48-652A-4C03-9C2F-2237ED237E02}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Voxelizer", "Voxelizer\Voxelizer.vcxproj", "{E48A0788-2669-40ED-B802-C90D26B78479}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DEMOffline", "DEM\DEMOffline\DEMOffline.vcxproj", "{2526BD4E-C443-4388-886B-AFD20CEFAA6E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -113,6 +115,14 @@ Global
 		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x64.Build.0 = Release|x64
 		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x86.ActiveCfg = Release|Win32
 		{E48A0788-2669-40ED-B802-C90D26B78479}.Release|x86.Build.0 = Release|Win32
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Debug|x64.ActiveCfg = Debug|x64
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Debug|x64.Build.0 = Debug|x64
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Debug|x86.ActiveCfg = Debug|Win32
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Debug|x86.Build.0 = Debug|Win32
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Release|x64.ActiveCfg = Release|x64
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Release|x64.Build.0 = Release|x64
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Release|x86.ActiveCfg = Release|Win32
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -125,6 +135,7 @@ Global
 		{5563DAD8-697A-4734-A4E7-234B59A5B70D} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
 		{537C92AD-6F3F-4377-930B-25BF1885B712} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
 		{38804A48-652A-4C03-9C2F-2237ED237E02} = {F7AAC15B-B2AE-4456-868E-D8D548330550}
+		{2526BD4E-C443-4388-886B-AFD20CEFAA6E} = {430B2B84-0B74-4B3C-8C15-F61262B5F3E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2E14C16A-5C0D-404F-BBD4-7DD0C51A0787}

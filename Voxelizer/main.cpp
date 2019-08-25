@@ -4,6 +4,7 @@
 #include <GL\freeglut.h>
 #include <exception>
 #include <cstdio>
+#include <memory>
 
 #include <glm\glm.hpp>
 #include <glm\gtc\type_ptr.hpp>

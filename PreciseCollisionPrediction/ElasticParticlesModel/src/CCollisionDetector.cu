@@ -1,5 +1,7 @@
 #include <device_launch_parameters.h>
 
+#include <thrust/device_malloc.h>
+
 #include "CCollisionDetector.hpp"
 #include "CSimulation.hpp"
 //#include <cuda_runtime.h>
